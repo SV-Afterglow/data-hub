@@ -25,11 +25,30 @@
 9. Safely eject the SD card
 
 ### 2. Physical Installation
-1. PICAN-M HAT Installation
-   - Carefully mount HAT on Raspberry Pi GPIO pins
-   - Connect to NMEA2000 backbone via Micro-C connector
+
+#### PICAN-M HAT Installation
+1. Power off your Raspberry Pi completely
+2. Carefully align the PICAN-M HAT with all GPIO pins on the Raspberry Pi
+   - The HAT should sit parallel to the Raspberry Pi board
+   - All pins should be fully inserted without bending
+3. Connect to NMEA2000 backbone via Micro-C connector
    - No terminators needed on PICAN-M connection
    - Device is powered directly from NMEA2000 network (12V)
+4. Power on the Raspberry Pi
+5. Verify HAT detection:
+   ```bash
+   # Check kernel messages for HAT detection
+   dmesg | grep mcp251x
+   
+   # Expected output should include:
+   # mcp251x spi0.0: MCP2515 successfully initialized
+   ```
+
+If the HAT is not detected:
+1. Power off the Raspberry Pi
+2. Check the HAT is properly seated on all GPIO pins
+3. Verify 12V power from NMEA2000 network
+4. Power on and check again
 
 ### 3. Automated Setup
 After completing the OS installation and physical setup:
@@ -40,23 +59,40 @@ After completing the OS installation and physical setup:
    ```
    When prompted for password, enter your vessel's name
 
-2. Clone this repository and run the setup script:
+2. Install git:
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y git
+   ```
+
+3. Clone this repository and prepare for setup:
    ```bash
    git clone https://github.com/SV-Afterglow/data-hub.git
    cd data-hub
+   chmod +x setup.sh
    ./setup.sh
    ```
-3. Reboot when prompted:
+
+The setup script will:
+- Check for PICAN-M HAT presence
+- Perform system updates
+- Install required packages
+- Configure CAN interface
+- Set up Docker and services
+- Provide guidance if HAT is not detected
+
+4. If the PICAN-M HAT was not detected during setup:
+   ```bash
+   # After installing HAT and rebooting:
+   sudo modprobe mcp251x
+   ip link show can0  # Verify CAN interface
+   candump can0       # Monitor NMEA2000 traffic
+   ```
+
+5. Reboot to complete setup:
    ```bash
    sudo reboot
    ```
-
-The setup script will automatically handle:
-- System updates
-- Required package installation
-- CAN interface configuration
-- Docker setup and configuration
-- Service deployment (SignalK, InfluxDB, Grafana)
 
 ### 4. Post-Installation Configuration
 
@@ -111,6 +147,7 @@ sudo apt-get install -y \
 ### CAN Interface Setup
 1. Create CAN interface configuration:
    ```bash
+   sudo mkdir -p /etc/network/interfaces.d
    sudo nano /etc/network/interfaces.d/can0
    ```
 
@@ -223,31 +260,53 @@ sudo apt-get install -y \
 ## Troubleshooting
 
 ### Common Issues
-1. CAN Interface Not Starting
-   - Check PICAN-M seat on GPIO
-   - Verify power from NMEA2000 (12V)
-   - Confirm modules loaded: `lsmod | grep can`
 
-2. No NMEA2000 Data
-   - Check candump output
-   - Verify 250000 bps speed setting
-   - Confirm SignalK NMEA2000 source configuration
+#### 1. PICAN-M HAT Not Detected
+- **Symptoms:**
+  - No `can0` interface
+  - No "mcp251x" in `dmesg` output
+  - SignalK shows no NMEA2000 data
+- **Solutions:**
+  1. Check physical installation:
+     - Power off Raspberry Pi
+     - Verify HAT is properly seated on all GPIO pins
+     - Check for bent pins
+     - Power on and check `dmesg` again
+  2. Verify power:
+     - Confirm 12V from NMEA2000 network
+     - Check voltage at HAT power points
+  3. Check kernel modules:
+     ```bash
+     lsmod | grep can    # Should show CAN modules
+     lsmod | grep mcp251x  # Should show MCP driver
+     sudo modprobe mcp251x  # Load driver if missing
+     ```
+  4. Verify SPI interface:
+     ```bash
+     ls /dev/spidev*  # Should show SPI devices
+     sudo raspi-config  # Enable SPI if needed
+     ```
 
-3. Container Issues
-   ```bash
-   # Check container status
-   docker ps -a
-   
-   # View container logs
-   docker logs signalk
-   docker logs influxdb
-   docker logs grafana
-   ```
+#### 2. No NMEA2000 Data
+- Check candump output
+- Verify 250000 bps speed setting
+- Confirm SignalK NMEA2000 source configuration
 
-4. No Data in InfluxDB
-   - Verify SignalK to InfluxDB plugin is installed and configured
-   - Check InfluxDB logs for write errors
-   - Verify network connectivity between containers
+#### 3. Container Issues
+```bash
+# Check container status
+docker ps -a
+
+# View container logs
+docker logs signalk
+docker logs influxdb
+docker logs grafana
+```
+
+#### 4. No Data in InfluxDB
+- Verify SignalK to InfluxDB plugin is installed and configured
+- Check InfluxDB logs for write errors
+- Verify network connectivity between containers
 
 ## Backup and Recovery
 
