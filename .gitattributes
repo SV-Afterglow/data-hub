@@ -1,0 +1,36 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Python files
+*.py text diff=python
+*.pyw text diff=python
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Documentation
+*.md text diff=markdown
+*.txt text
+*.rst text
+
+# Docker
+*.dockerfile text
+Dockerfile text
+docker-compose*.yml text
+
+# Configs
+*.json text
+*.yaml text
+*.yml text
+*.toml text
+*.conf text
+*.config text
+
+# Binary files (no line-ending conversion)
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.gz binary
+*.zip binary

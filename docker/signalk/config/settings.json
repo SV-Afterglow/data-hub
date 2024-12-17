@@ -1,0 +1,26 @@
+{
+    "interfaces": {
+      "nmea-2000": {
+        "type": "nmea-2000",
+        "canDevice": "can0",
+        "preferredAddress": 100,
+        "applicationId": "signalk-server"
+      }
+    },
+    "pipedProviders": [],
+    "security": {
+      "strategy": "tk.signalk.security.noauth"
+    },
+    "plugins": {
+      "@signalk/signalk-to-influxdb": {
+        "enabled": true,
+        "configuration": {
+          "host": "localhost",
+          "port": 8086,
+          "database": "signalk",
+          "batchSize": 100,
+          "interval": 1000
+        }
+      }
+    }
+  }

@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  signalk:
+    build:
+      context: ..
+      dockerfile: docker/signalk/Dockerfile
+    image: ghcr.io/sv-afterglow/data-hub/signalk:latest
+    restart: always
+    network_mode: host  # Required for NMEA2000
+    volumes:
+      - ~/.signalk:/home/node/.signalk
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - influxdb
+
+  influxdb:
+    build:
+      context: ..
+      dockerfile: docker/influxdb/Dockerfile
+    image: ghcr.io/sv-afterglow/data-hub/influxdb:latest
+    restart: always
+    ports:
+      - "8086:8086"
+    volumes:
+      - ~/influxdb-data:/var/lib/influxdb
+    environment:
+      - INFLUXDB_DB=signalk
+      - INFLUXDB_HTTP_AUTH_ENABLED=false
+
+  grafana:
+    build:
+      context: ..
+      dockerfile: docker/grafana/Dockerfile
+    image: ghcr.io/sv-afterglow/data-hub/grafana:latest
+    restart: always
+    ports:
+      - "3001:3000"
+    volumes:
+      - ~/grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - influxdb
+
+  watchtower:
+    image: containrrr/watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --cleanup --interval 30
