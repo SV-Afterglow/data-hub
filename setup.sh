@@ -58,6 +58,13 @@ spinner() {
     printf "    \b\b\b\b"
 }
 
+# Error handling function
+handle_error() {
+    print_error "An error occurred during setup!"
+    print_error "$1"
+    exit 1
+}
+
 # Exit immediately if any command fails
 set -e
 
@@ -77,29 +84,45 @@ fi
 # System Updates
 print_header "System Update"
 print_step "Updating package lists..."
-sudo apt update > /dev/null 2>&1 & spinner $!
+if ! sudo apt update > /dev/null 2>&1; then
+    handle_error "Failed to update package lists"
+fi
 print_success "Package lists updated"
 
 print_step "Upgrading system packages..."
-sudo apt upgrade -y > /dev/null 2>&1 & spinner $!
+if ! sudo apt upgrade -y > /dev/null 2>&1; then
+    handle_error "Failed to upgrade system packages"
+fi
 print_success "System packages upgraded"
 
 # Package Installation
 print_header "Installing Required Packages"
 print_step "Installing git, docker, and CAN utilities..."
-sudo apt install -y git docker.io docker-compose can-utils > /dev/null 2>&1 & spinner $!
+if ! sudo apt install -y git docker.io docker-compose can-utils > /dev/null 2>&1; then
+    handle_error "Failed to install required packages"
+fi
 print_success "Required packages installed"
 
 # Docker Setup
 print_header "Docker Configuration"
 print_step "Setting up Docker permissions..."
-sudo usermod -aG docker $USER
+if ! sudo usermod -aG docker $USER; then
+    handle_error "Failed to add user to docker group"
+fi
 print_success "Docker permissions configured"
+
+print_step "Starting Docker service..."
+if ! sudo systemctl start docker; then
+    handle_error "Failed to start Docker service"
+fi
+print_success "Docker service started"
 
 # Hardware Configuration
 print_header "Hardware Configuration"
 print_step "Enabling SPI interface..."
-sudo raspi-config nonint do_spi 0
+if ! sudo raspi-config nonint do_spi 0; then
+    handle_error "Failed to enable SPI interface"
+fi
 print_success "SPI interface enabled"
 
 # PICAN-M HAT Check
@@ -119,41 +142,49 @@ fi
 # CAN Configuration
 print_header "CAN Interface Configuration"
 print_step "Creating network configuration directory..."
-sudo mkdir -p /etc/network/interfaces.d
+if ! sudo mkdir -p /etc/network/interfaces.d; then
+    handle_error "Failed to create network configuration directory"
+fi
 
 print_step "Configuring CAN interface..."
-sudo tee /etc/network/interfaces.d/can0 > /dev/null << EOF
+if ! sudo tee /etc/network/interfaces.d/can0 > /dev/null << EOF
 auto can0
 iface can0 inet manual
     pre-up /sbin/ip link set can0 type can bitrate 250000
     up /sbin/ip link set can0 up
     down /sbin/ip link set can0 down
 EOF
+then
+    handle_error "Failed to configure CAN interface"
+fi
 print_success "CAN interface configured"
 
 # Kernel Modules
 print_header "Kernel Module Configuration"
 print_step "Setting up CAN kernel modules..."
 if ! grep -q "mcp251x" /etc/modules; then
-    sudo tee -a /etc/modules > /dev/null << EOF
+    if ! sudo tee -a /etc/modules > /dev/null << EOF
 mcp251x
 can_dev
 can
 can_raw
 EOF
+then
+    handle_error "Failed to configure kernel modules"
+fi
 fi
 print_success "Kernel modules configured"
 
 # Data Directories
 print_header "Creating Data Directories"
 print_step "Setting up service directories..."
-mkdir -p ~/influxdb-data ~/.signalk ~/grafana-data
+mkdir -p ~/influxdb-data ~/.signalk ~/grafana-data || handle_error "Failed to create data directories"
 print_success "Data directories created"
 
 # InfluxDB Configuration
 print_header "InfluxDB Configuration"
 print_step "Creating InfluxDB configuration..."
-cat > ~/influxdb.conf << EOF
+if ! cat > ~/influxdb.conf << EOF
 [meta]
   dir = "/var/lib/influxdb/meta"
 
@@ -166,12 +197,15 @@ cat > ~/influxdb.conf << EOF
   bind-address = ":8086"
   auth-enabled = false
 EOF
+then
+    handle_error "Failed to create InfluxDB configuration"
+fi
 print_success "InfluxDB configured"
 
 # Docker Compose
 print_header "Docker Services Configuration"
 print_step "Creating docker-compose configuration..."
-cat > docker-compose.yml << EOF
+if ! cat > docker-compose.yml << EOF
 version: '3'
 services:
   signalk:
@@ -213,12 +247,28 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     command: --cleanup --interval 30
 EOF
+then
+    handle_error "Failed to create docker-compose configuration"
+fi
 print_success "Docker services configured"
 
 # Start Services
 print_header "Starting Services"
 print_step "Launching Docker containers..."
-docker-compose up -d & spinner $!
+
+# Ensure Docker socket has correct permissions
+sudo chmod 666 /var/run/docker.sock || handle_error "Failed to set Docker socket permissions"
+
+# Pull images first
+print_info "Pulling Docker images (this may take a few minutes)..."
+if ! docker-compose pull > /dev/null 2>&1; then
+    handle_error "Failed to pull Docker images"
+fi
+
+# Start services
+if ! docker-compose up -d > /dev/null 2>&1; then
+    handle_error "Failed to start Docker services"
+fi
 print_success "Services started successfully"
 
 # Setup Complete
