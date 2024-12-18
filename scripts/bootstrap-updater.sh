@@ -50,6 +50,7 @@ curl -s "$BASE_URL/version.yml" > ~/.data-hub/version.yml
 # Create update service compose file
 cat > ~/.data-hub/update-service/docker-compose.yaml << EOF
 version: '3.8'
+name: data-hub
 services:
   update-service:
     build: .
@@ -64,6 +65,12 @@ services:
       - GITHUB_BRANCH=main
       - UPDATE_CHECK_INTERVAL=3600
       - INFLUX_URL=http://influxdb:8086
+    networks:
+      - data-hub_default
+
+networks:
+  data-hub_default:
+    external: true
 EOF
 
 # Create Dockerfile for update service

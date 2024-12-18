@@ -9,8 +9,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 from packaging import version
-from influxdb_client import InfluxDBClient, Point
-from influxdb_client.client.write_api import SYNCHRONOUS
+from influxdb import InfluxDBClient  # Changed to use InfluxDB 1.8 client
 
 # Configuration from environment variables
 GITHUB_REPO = os.getenv('GITHUB_REPO', 'sv-afterglow/data-hub')
@@ -19,7 +18,7 @@ CHECK_INTERVAL = int(os.getenv('UPDATE_CHECK_INTERVAL', '3600'))  # Default 1 ho
 DATA_DIR = Path(os.getenv('DATA_DIR', '/data'))
 COMPOSE_DIR = Path('/data/docker/compose')  # Fixed path for compose files
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
-INFLUX_BUCKET = "system_updates"
+INFLUX_DB = "system_updates"
 
 # Setup logging
 logging.basicConfig(
@@ -39,10 +38,10 @@ def compare_versions(v1, v2):
 class UpdateService:
     def __init__(self):
         self.docker_client = docker.from_env()
-        self.influx_client = InfluxDBClient(url=INFLUX_URL)
+        self.influx_client = InfluxDBClient(host='influxdb', port=8086)
         self.version_file = DATA_DIR / 'version.yml'
         self.backup_dir = DATA_DIR / 'backups'
-        self.compose_file = COMPOSE_DIR / 'docker-compose.yaml'  # Updated path
+        self.compose_file = COMPOSE_DIR / 'docker-compose.yaml'
         self.ensure_directories()
         self.setup_influxdb()
 
@@ -53,34 +52,26 @@ class UpdateService:
         COMPOSE_DIR.mkdir(parents=True, exist_ok=True)
 
     def setup_influxdb(self):
-        """Setup InfluxDB bucket for update metrics."""
+        """Setup InfluxDB database for update metrics."""
         try:
-            buckets_api = self.influx_client.buckets_api()
-            if INFLUX_BUCKET not in [bucket.name for bucket in buckets_api.find_buckets()]:
-                buckets_api.create_bucket(bucket_name=INFLUX_BUCKET)
-                logger.info(f"Created InfluxDB bucket: {INFLUX_BUCKET}")
+            databases = self.influx_client.get_list_database()
+            if INFLUX_DB not in [db['name'] for db in databases]:
+                self.influx_client.create_database(INFLUX_DB)
+                logger.info(f"Created InfluxDB database: {INFLUX_DB}")
+            self.influx_client.switch_database(INFLUX_DB)
         except Exception as e:
             logger.error(f"Error setting up InfluxDB: {e}")
 
     def log_metric(self, measurement, fields, tags=None):
         """Log a metric to InfluxDB."""
         try:
-            write_api = self.influx_client.write_api(write_options=SYNCHRONOUS)
-            point = Point(measurement)
-            
-            if tags:
-                for key, value in tags.items():
-                    point = point.tag(key, str(value))
-            
-            for key, value in fields.items():
-                if isinstance(value, bool):
-                    point = point.field(key, value)
-                elif isinstance(value, (int, float)):
-                    point = point.field(key, value)
-                else:
-                    point = point.field(key, str(value))
-            
-            write_api.write(bucket=INFLUX_BUCKET, record=point)
+            point = {
+                "measurement": measurement,
+                "tags": tags or {},
+                "fields": fields,
+                "time": datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+            }
+            self.influx_client.write_points([point])
         except Exception as e:
             logger.error(f"Failed to log metric: {e}")
 
@@ -126,7 +117,7 @@ class UpdateService:
         
         try:
             # Backup docker-compose config
-            compose_backup = backup_path / 'docker-compose.yaml'  # Updated extension
+            compose_backup = backup_path / 'docker-compose.yaml'
             compose_backup.parent.mkdir(parents=True, exist_ok=True)
             if self.compose_file.exists():
                 with open(self.compose_file, 'r') as src:
@@ -203,7 +194,7 @@ class UpdateService:
             start_time = time.time()
             
             # Restore docker-compose config
-            compose_backup = Path(backup_path) / 'docker-compose.yaml'  # Updated extension
+            compose_backup = Path(backup_path) / 'docker-compose.yaml'
             if compose_backup.exists():
                 with open(compose_backup, 'r') as src:
                     with open(self.compose_file, 'w') as dst:
