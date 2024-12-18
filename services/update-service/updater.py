@@ -16,7 +16,8 @@ GITHUB_REPO = os.getenv('GITHUB_REPO', 'sv-afterglow/data-hub')
 GITHUB_BRANCH = os.getenv('GITHUB_BRANCH', 'main')
 CHECK_INTERVAL = int(os.getenv('UPDATE_CHECK_INTERVAL', '3600'))  # Default 1 hour
 DATA_DIR = Path(os.getenv('DATA_DIR', '/data'))
-COMPOSE_DIR = Path('/data/docker/compose')  # Fixed path for compose files
+HOME_DIR = Path(os.path.expanduser('~'))
+COMPOSE_FILE = HOME_DIR / 'docker-compose.yml'  # Where we write the compose file
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
 INFLUX_DB = "system_updates"
 
@@ -41,7 +42,6 @@ class UpdateService:
         self.influx_client = InfluxDBClient(host='influxdb', port=8086)
         self.version_file = DATA_DIR / 'version.yml'
         self.backup_dir = DATA_DIR / 'backups'
-        self.compose_file = COMPOSE_DIR / 'docker-compose.yaml'
         self.ensure_directories()
         self.setup_influxdb()
 
@@ -49,7 +49,6 @@ class UpdateService:
         """Ensure required directories exist."""
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
-        COMPOSE_DIR.mkdir(parents=True, exist_ok=True)
 
     def setup_influxdb(self):
         """Setup InfluxDB database for update metrics."""
@@ -101,8 +100,8 @@ class UpdateService:
     def get_expected_services(self):
         """Get list of expected services from docker-compose.yml."""
         try:
-            if self.compose_file.exists():
-                with open(self.compose_file, 'r') as f:
+            if COMPOSE_FILE.exists():
+                with open(COMPOSE_FILE, 'r') as f:
                     compose_data = yaml.safe_load(f)
                     return set(compose_data.get('services', {}).keys())
             return set()
@@ -119,8 +118,8 @@ class UpdateService:
             # Backup docker-compose config
             compose_backup = backup_path / 'docker-compose.yaml'
             compose_backup.parent.mkdir(parents=True, exist_ok=True)
-            if self.compose_file.exists():
-                with open(self.compose_file, 'r') as src:
+            if COMPOSE_FILE.exists():
+                with open(COMPOSE_FILE, 'r') as src:
                     with open(compose_backup, 'w') as dst:
                         dst.write(src.read())
 
@@ -197,7 +196,7 @@ class UpdateService:
             compose_backup = Path(backup_path) / 'docker-compose.yaml'
             if compose_backup.exists():
                 with open(compose_backup, 'r') as src:
-                    with open(self.compose_file, 'w') as dst:
+                    with open(COMPOSE_FILE, 'w') as dst:
                         dst.write(src.read())
 
             # Restore service configurations
@@ -206,8 +205,8 @@ class UpdateService:
                 # Add specific config restore logic here
                 pass
 
-            # Restart services using the correct compose file path
-            os.system(f'docker-compose -f {self.compose_file} up -d')
+            # Restart services
+            os.system(f'cd {HOME_DIR} && docker-compose up -d')
             
             duration = time.time() - start_time
             self.log_metric("rollback",
@@ -253,13 +252,14 @@ class UpdateService:
                 step_type = step['type']
                 try:
                     if step_type == 'system_package':
-                        os.system(f"apt-get install -y {step['package']}")
+                        # Use apt-get with sudo
+                        os.system(f"sudo apt-get update && sudo apt-get install -y {step['package']}")
                     elif step_type == 'docker_compose':
-                        # Update docker-compose.yml
+                        # Update docker-compose.yml from the template in docker/compose/
                         compose_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/docker/compose/docker-compose.yaml"
                         response = requests.get(compose_url)
                         response.raise_for_status()
-                        with open(self.compose_file, 'w') as f:
+                        with open(COMPOSE_FILE, 'w') as f:
                             f.write(response.text)
                     elif step_type == 'service_config':
                         # Update service configuration
@@ -296,8 +296,8 @@ class UpdateService:
             with open(self.version_file, 'w') as f:
                 yaml.dump({'version': version}, f)
 
-            # Restart services using the correct compose file path
-            os.system(f'docker-compose -f {self.compose_file} up -d')
+            # Restart services from the home directory
+            os.system(f'cd {HOME_DIR} && docker-compose up -d')
 
             # Verify update
             if not self.verify_update(version):
