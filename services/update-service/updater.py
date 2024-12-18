@@ -6,6 +6,7 @@ import yaml
 import docker
 import requests
 import logging
+import subprocess
 from pathlib import Path
 from datetime import datetime
 from packaging import version
@@ -152,7 +153,7 @@ class UpdateService:
 
             # Check all expected containers are running
             containers = self.docker_client.containers.list()
-            running_services = {c.name.split('_')[1] for c in containers}  # Updated to handle service names correctly
+            running_services = {c.name.split('_')[1] for c in containers}
             
             missing_services = expected_services - running_services
             if missing_services:
@@ -184,6 +185,82 @@ class UpdateService:
             logger.error(f"Update verification failed: {e}")
             return False
 
+    def restart_services(self):
+        """Restart all services using docker commands."""
+        try:
+            # Get list of services from compose file
+            with open(COMPOSE_FILE, 'r') as f:
+                compose_data = yaml.safe_load(f)
+                services = compose_data.get('services', {}).keys()
+
+            # Stop and remove existing containers
+            for service in services:
+                container_name = f"data-hub_{service}_1"
+                try:
+                    container = self.docker_client.containers.get(container_name)
+                    container.stop()
+                    container.remove()
+                except docker.errors.NotFound:
+                    pass  # Container doesn't exist, which is fine
+
+            # Pull latest images
+            for service in services:
+                image_name = compose_data['services'][service].get('image')
+                if image_name:
+                    try:
+                        self.docker_client.images.pull(image_name)
+                    except Exception as e:
+                        logger.error(f"Failed to pull image for {service}: {e}")
+
+            # Start services using docker run
+            for service_name, service_config in compose_data['services'].items():
+                container_name = f"data-hub_{service_name}_1"
+                
+                # Basic configuration
+                run_kwargs = {
+                    'name': container_name,
+                    'detach': True,
+                    'restart_policy': {"Name": "always"},
+                }
+
+                # Add environment variables
+                if 'environment' in service_config:
+                    run_kwargs['environment'] = service_config['environment']
+
+                # Add volumes
+                if 'volumes' in service_config:
+                    run_kwargs['volumes'] = service_config['volumes']
+
+                # Add ports
+                if 'ports' in service_config:
+                    ports = {}
+                    for port_mapping in service_config['ports']:
+                        host_port, container_port = port_mapping.split(':')
+                        ports[container_port] = host_port
+                    run_kwargs['ports'] = ports
+
+                # Add network mode if specified
+                if 'network_mode' in service_config:
+                    run_kwargs['network_mode'] = service_config['network_mode']
+
+                # Add command if specified
+                if 'command' in service_config:
+                    run_kwargs['command'] = service_config['command']
+
+                try:
+                    self.docker_client.containers.run(
+                        service_config.get('image'),
+                        **run_kwargs
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to start {service_name}: {e}")
+                    raise
+
+            return True
+        except Exception as e:
+            logger.error(f"Failed to restart services: {e}")
+            return False
+
     def rollback_update(self, backup_path):
         """Rollback system to previous state."""
         if not backup_path or not Path(backup_path).exists():
@@ -206,8 +283,9 @@ class UpdateService:
                 # Add specific config restore logic here
                 pass
 
-            # Restart services using docker compose command
-            os.system(f'cd {COMPOSE_FILE.parent} && docker compose up -d')
+            # Restart services
+            if not self.restart_services():
+                raise Exception("Failed to restart services during rollback")
             
             duration = time.time() - start_time
             self.log_metric("rollback",
@@ -269,8 +347,14 @@ class UpdateService:
                         with open(target_path, 'w') as f:
                             f.write(response.text)
                     elif step_type == 'system_package':
-                        # Install system package
-                        os.system(f'sudo apt-get update && sudo apt-get install -y {step["package"]}')
+                        # Install system package using apt-get
+                        cmd = f"apt-get update && apt-get install -y {step['package']}"
+                        result = subprocess.run(['apt-get', 'update'], capture_output=True, text=True)
+                        if result.returncode != 0:
+                            raise Exception(f"apt-get update failed: {result.stderr}")
+                        result = subprocess.run(['apt-get', 'install', '-y', step['package']], capture_output=True, text=True)
+                        if result.returncode != 0:
+                            raise Exception(f"Package installation failed: {result.stderr}")
 
                     completed_steps += 1
                     step_duration = time.time() - step_start
@@ -297,8 +381,9 @@ class UpdateService:
             with open(self.version_file, 'w') as f:
                 yaml.dump({'version': version}, f)
 
-            # Restart services using docker compose command
-            os.system(f'cd {COMPOSE_FILE.parent} && docker compose up -d')
+            # Restart services
+            if not self.restart_services():
+                raise Exception("Failed to restart services")
 
             # Verify update
             if not self.verify_update(version):
