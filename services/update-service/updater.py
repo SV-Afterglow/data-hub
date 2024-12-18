@@ -18,11 +18,13 @@ GITHUB_BRANCH = os.getenv('GITHUB_BRANCH', 'main')
 CHECK_INTERVAL = int(os.getenv('UPDATE_CHECK_INTERVAL', '3600'))  # Default 1 hour
 DATA_DIR = Path(os.getenv('DATA_DIR', '/data'))
 HOME_DIR = Path(os.path.expanduser('~'))
-COMPOSE_FILE = HOME_DIR / 'data-hub/docker-compose.yml'  # Main compose file
+REPO_ROOT = DATA_DIR / 'data-hub'  # Repository root path
+COMPOSE_FILE = REPO_ROOT / 'docker/compose/docker-compose.yaml'  # Compose file relative to repo root
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
 INFLUX_DB = "system_updates"
 NETWORK_NAME = 'data-hub_data-hub'
 
+[Previous code unchanged until build section in restart_services]
 # Setup logging with more detail
 logging.basicConfig(
     level=logging.DEBUG,  # Changed to DEBUG for more detail
@@ -42,8 +44,8 @@ class UpdateService:
     def __init__(self):
         self.docker_client = docker.from_env()
         self.influx_client = InfluxDBClient(host='influxdb', port=8086)
-        self.version_file = DATA_DIR / 'version.yml'
-        self.backup_dir = DATA_DIR / 'backups'
+        self.version_file = REPO_ROOT / 'version.yml'  # Version file relative to repo root
+        self.backup_dir = DATA_DIR / 'backups'  # Keep backups in data dir
         self.ensure_directories()
         self.setup_influxdb()
 
@@ -296,12 +298,15 @@ class UpdateService:
                         logger.debug(f"Building image for {service_name}")
                         logger.debug(f"Context: {context}")
                         logger.debug(f"Dockerfile: {dockerfile}")
-                        
+
+                        # Use the repository root as build context
+                        repo_root = REPO_ROOT
                         self.docker_client.images.build(
-                            path=str(COMPOSE_FILE.parent / context),
-                            dockerfile=str(COMPOSE_FILE.parent / dockerfile) if dockerfile else None,
+                            path=str(repo_root),
+                            dockerfile=str(repo_root / dockerfile) if dockerfile else None,
                             tag=tag
                         )
+
                         run_kwargs['image'] = tag
                     else:
                         run_kwargs['image'] = service_config['image']
@@ -403,7 +408,7 @@ class UpdateService:
                         logger.debug(f"Downloading config from {config_url}")
                         response = requests.get(config_url)
                         response.raise_for_status()
-                        target_path = DATA_DIR / step['target'].lstrip('/data/')
+                        target_path = REPO_ROOT / step['target'].lstrip('/data/data-hub/')  # Update target path to use repo root
                         os.makedirs(os.path.dirname(target_path), exist_ok=True)
                         with open(target_path, 'w') as f:
                             f.write(response.text)
@@ -512,3 +517,4 @@ class UpdateService:
 if __name__ == "__main__":
     service = UpdateService()
     service.run()
+
