@@ -43,8 +43,32 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 # Download necessary files
 curl -s "$BASE_URL/services/update-service/requirements.txt" > "$TMP_DIR/requirements.txt"
 curl -s "$BASE_URL/services/update-service/updater.py" > "$TMP_DIR/updater.py"
-curl -s "$BASE_URL/docker/update-service/Dockerfile" > "$TMP_DIR/Dockerfile"
 curl -s "$BASE_URL/version.yml" > ~/.data-hub/version.yml
+
+# Create local Dockerfile that uses the downloaded files
+cat > "$TMP_DIR/Dockerfile" << 'EOF'
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    docker.io \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy service code
+COPY updater.py .
+
+# Make script executable
+RUN chmod +x updater.py
+
+CMD ["./updater.py"]
+EOF
 
 # Create docker-compose file for update service
 cat > "$TMP_DIR/docker-compose.yml" << EOF
@@ -52,9 +76,7 @@ version: '3.8'
 
 services:
   update-service:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     image: ghcr.io/sv-afterglow/data-hub/update-service:latest
     restart: always
     volumes:
