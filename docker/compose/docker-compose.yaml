@@ -3,7 +3,7 @@ version: '3.8'
 services:
   signalk:
     build:
-      context: ..
+      context: .
       dockerfile: docker/signalk/Dockerfile
     image: ghcr.io/sv-afterglow/data-hub/signalk:latest
     restart: always
@@ -16,7 +16,7 @@ services:
 
   influxdb:
     build:
-      context: ..
+      context: .
       dockerfile: docker/influxdb/Dockerfile
     image: ghcr.io/sv-afterglow/data-hub/influxdb:latest
     restart: always
@@ -30,7 +30,7 @@ services:
 
   grafana:
     build:
-      context: ..
+      context: .
       dockerfile: docker/grafana/Dockerfile
     image: ghcr.io/sv-afterglow/data-hub/grafana:latest
     restart: always
@@ -45,7 +45,7 @@ services:
 
   system-metrics:
     build:
-      context: ..
+      context: .
       dockerfile: docker/system-metrics/Dockerfile
     restart: always
     volumes:
@@ -59,7 +59,7 @@ services:
 
   update-service:
     build:
-      context: ..
+      context: .
       dockerfile: docker/update-service/Dockerfile
     restart: always
     volumes:
