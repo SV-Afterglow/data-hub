@@ -89,8 +89,11 @@ WORKDIR /app
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install dependencies with extra index for ARM wheels
-RUN pip install --no-cache-dir --extra-index-url https://www.piwheels.org/simple -r requirements.txt
+# Force pure Python implementation of msgpack
+ENV MSGPACK_PUREPYTHON=1
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy service code
 COPY updater.py .
