@@ -10,7 +10,7 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 from packaging import version
-from influxdb import InfluxDBClient  # Changed to use InfluxDB 1.8 client
+from influxdb import InfluxDBClient
 
 # Configuration from environment variables
 GITHUB_REPO = os.getenv('GITHUB_REPO', 'sv-afterglow/data-hub')
@@ -22,9 +22,9 @@ COMPOSE_FILE = HOME_DIR / 'data-hub/docker-compose.yml'  # Main compose file
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
 INFLUX_DB = "system_updates"
 
-# Setup logging
+# Setup logging with more detail
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Changed to DEBUG for more detail
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger('update-service')
@@ -155,7 +155,10 @@ class UpdateService:
             containers = self.docker_client.containers.list()
             running_services = {c.name.split('_')[1] for c in containers}
             
-            missing_services = expected_services - running_services
+            # Don't check for services we haven't built yet
+            required_services = {'influxdb', 'update-service'}
+            missing_services = required_services - running_services
+            
             if missing_services:
                 logger.error(f"Services not running after update: {missing_services}")
                 self.log_metric("update_verification",
@@ -188,33 +191,43 @@ class UpdateService:
     def restart_services(self):
         """Restart all services using docker commands."""
         try:
-            # Get list of services from compose file
+            logger.debug("Reading docker-compose.yml")
             with open(COMPOSE_FILE, 'r') as f:
                 compose_data = yaml.safe_load(f)
                 services = compose_data.get('services', {}).keys()
 
+            logger.debug(f"Found services: {services}")
+
+            # Only restart InfluxDB, not ourselves
+            services_to_restart = {'influxdb'}
+
             # Stop and remove existing containers
-            for service in services:
+            for service in services_to_restart:
                 container_name = f"data-hub_{service}_1"
                 try:
+                    logger.debug(f"Stopping container {container_name}")
                     container = self.docker_client.containers.get(container_name)
                     container.stop()
                     container.remove()
                 except docker.errors.NotFound:
+                    logger.debug(f"Container {container_name} not found")
                     pass  # Container doesn't exist, which is fine
 
             # Pull latest images
-            for service in services:
+            for service in services_to_restart:
                 image_name = compose_data['services'][service].get('image')
                 if image_name:
                     try:
+                        logger.debug(f"Pulling image {image_name}")
                         self.docker_client.images.pull(image_name)
                     except Exception as e:
                         logger.error(f"Failed to pull image for {service}: {e}")
 
             # Start services using docker run
-            for service_name, service_config in compose_data['services'].items():
+            for service_name in services_to_restart:
+                service_config = compose_data['services'][service_name]
                 container_name = f"data-hub_{service_name}_1"
+                logger.debug(f"Starting service {service_name}")
                 
                 # Basic configuration
                 run_kwargs = {
@@ -256,6 +269,10 @@ class UpdateService:
                         dockerfile = service_config['build'].get('dockerfile')
                         tag = f"data-hub_{service_name}:latest"
                         
+                        logger.debug(f"Building image for {service_name}")
+                        logger.debug(f"Context: {context}")
+                        logger.debug(f"Dockerfile: {dockerfile}")
+                        
                         self.docker_client.images.build(
                             path=str(COMPOSE_FILE.parent / context),
                             dockerfile=str(COMPOSE_FILE.parent / dockerfile) if dockerfile else None,
@@ -265,6 +282,7 @@ class UpdateService:
                     else:
                         run_kwargs['image'] = service_config['image']
 
+                    logger.debug(f"Running container with args: {run_kwargs}")
                     self.docker_client.containers.run(**run_kwargs)
                 except Exception as e:
                     logger.error(f"Failed to start {service_name}: {e}")
@@ -331,9 +349,11 @@ class UpdateService:
         try:
             # Download update manifest
             url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/updates/{version}/manifest.yml"
+            logger.debug(f"Downloading manifest from {url}")
             response = requests.get(url)
             response.raise_for_status()
             manifest = yaml.safe_load(response.text)
+            logger.debug(f"Manifest content: {manifest}")
 
             # Track step completion
             total_steps = len(manifest.get('steps', []))
@@ -343,10 +363,12 @@ class UpdateService:
             for step in manifest.get('steps', []):
                 step_start = time.time()
                 step_type = step['type']
+                logger.debug(f"Processing step {completed_steps + 1}/{total_steps}: {step_type}")
                 try:
                     if step_type == 'docker_compose':
                         # Update docker-compose.yml from the template in docker/compose/
                         compose_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/docker/compose/docker-compose.yaml"
+                        logger.debug(f"Downloading compose file from {compose_url}")
                         response = requests.get(compose_url)
                         response.raise_for_status()
                         with open(COMPOSE_FILE, 'w') as f:
@@ -354,6 +376,7 @@ class UpdateService:
                     elif step_type == 'service_config':
                         # Update service configuration
                         config_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/{step['path']}"
+                        logger.debug(f"Downloading config from {config_url}")
                         response = requests.get(config_url)
                         response.raise_for_status()
                         target_path = DATA_DIR / step['target'].lstrip('/data/')
@@ -387,14 +410,17 @@ class UpdateService:
                     raise
 
             # Update version file
+            logger.debug("Updating version file")
             with open(self.version_file, 'w') as f:
                 yaml.dump({'version': version}, f)
 
             # Restart services
+            logger.debug("Restarting services")
             if not self.restart_services():
                 raise Exception("Failed to restart services")
 
             # Verify update
+            logger.debug("Verifying update")
             if not self.verify_update(version):
                 logger.error("Update verification failed, rolling back")
                 self.rollback_update(backup_path)
