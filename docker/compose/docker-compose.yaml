@@ -40,9 +40,6 @@ services:
       - ~/grafana-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_PATHS_DATA=/var/lib/grafana
-      - GF_USERS_ALLOW_SIGN_UP=false
-    user: "472:472"
     depends_on:
       - influxdb
 
@@ -50,7 +47,6 @@ services:
     build:
       context: ..
       dockerfile: docker/system-metrics/Dockerfile
-    image: ghcr.io/sv-afterglow/data-hub/system-metrics:latest
     restart: always
     volumes:
       - /etc/localtime:/etc/localtime:ro
@@ -65,7 +61,6 @@ services:
     build:
       context: ..
       dockerfile: docker/update-service/Dockerfile
-    image: ghcr.io/sv-afterglow/data-hub/update-service:latest
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

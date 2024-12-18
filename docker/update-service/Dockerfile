@@ -3,7 +3,8 @@ FROM python:3.11-slim
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     docker.io \
-    python3-psutil \
+    gcc \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
@@ -15,13 +16,17 @@ COPY services/update-service/requirements.txt .
 # Force pure Python implementation of msgpack
 ENV MSGPACK_PUREPYTHON=1
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies including psutil
+RUN pip install --no-cache-dir -r requirements.txt psutil
 
 # Copy service code
 COPY services/update-service/updater.py .
 
 # Make script executable
 RUN chmod +x updater.py
+
+# Add docker group to avoid permission issues
+RUN groupadd -g 999 docker && \
+    usermod -aG docker root
 
 CMD ["./updater.py"]
