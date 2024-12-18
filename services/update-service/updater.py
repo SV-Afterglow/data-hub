@@ -17,7 +17,7 @@ GITHUB_BRANCH = os.getenv('GITHUB_BRANCH', 'main')
 CHECK_INTERVAL = int(os.getenv('UPDATE_CHECK_INTERVAL', '3600'))  # Default 1 hour
 DATA_DIR = Path(os.getenv('DATA_DIR', '/data'))
 HOME_DIR = Path(os.path.expanduser('~'))
-COMPOSE_FILE = HOME_DIR / 'data-hub/docker-compose.yml'  # Updated path
+COMPOSE_FILE = HOME_DIR / 'data-hub/docker-compose.yml'  # Main compose file
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
 INFLUX_DB = "system_updates"
 
@@ -152,7 +152,7 @@ class UpdateService:
 
             # Check all expected containers are running
             containers = self.docker_client.containers.list()
-            running_services = {c.name.split('_')[-1] for c in containers}
+            running_services = {c.name.split('_')[1] for c in containers}  # Updated to handle service names correctly
             
             missing_services = expected_services - running_services
             if missing_services:
@@ -268,6 +268,9 @@ class UpdateService:
                         os.makedirs(os.path.dirname(target_path), exist_ok=True)
                         with open(target_path, 'w') as f:
                             f.write(response.text)
+                    elif step_type == 'system_package':
+                        # Install system package
+                        os.system(f'sudo apt-get update && sudo apt-get install -y {step["package"]}')
 
                     completed_steps += 1
                     step_duration = time.time() - step_start
