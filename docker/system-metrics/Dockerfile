@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /app
 
+# Create data directory structure
+RUN mkdir -p /data/services/system-metrics
+
 # Copy requirements first for better caching
 COPY services/system-metrics/requirements.txt .
 
