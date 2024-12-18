@@ -40,19 +40,27 @@ echo "Setting up update service in $TMP_DIR"
 mkdir -p "$TMP_DIR/update-service"
 cd "$TMP_DIR/update-service"
 
+# Create requirements.txt directly instead of downloading
+cat > requirements.txt << EOF
+pyyaml>=6.0.1
+docker>=6.1.3
+requests>=2.31.0
+influxdb-client>=1.36.1
+semver>=3.0.0
+EOF
+
 # Download the update service files
 echo "Downloading update service files..."
 REPO="sv-afterglow/data-hub"
 BRANCH="main"
 BASE_URL="https://raw.githubusercontent.com/$REPO/$BRANCH"
 
-# Download files directly to the working directory
-curl -s "$BASE_URL/services/update-service/requirements.txt" > requirements.txt
+# Download updater.py
 curl -s "$BASE_URL/services/update-service/updater.py" > updater.py
 curl -s "$BASE_URL/version.yml" > ~/.data-hub/version.yml
 
 # Verify downloads
-if [ ! -f requirements.txt ] || [ ! -f updater.py ]; then
+if [ ! -f updater.py ]; then
     echo -e "${RED}Failed to download required files${NC}"
     exit 1
 fi
