@@ -1,0 +1,22 @@
+version: "1.1.1"
+requires: "1.1.0"
+release_date: "2024-12-18"
+description: "Improved system metrics organization with separate measurements and tags"
+
+steps:
+  - type: "service_config"
+    path: "services/system-metrics/collector.py"
+    target: "/data/services/system-metrics/collector.py"
+    description: "Update system metrics collector with improved measurements and tags"
+    permissions: "755"
+
+  - type: "docker_compose"
+    description: "Restart system-metrics service to apply changes"
+    service: "system-metrics"
+    action: "restart"
+
+rollback:
+  supported: true
+  steps:
+    - "Restore previous collector.py"
+    - "Restart system-metrics service"
