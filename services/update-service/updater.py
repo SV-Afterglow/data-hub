@@ -361,8 +361,9 @@ class UpdateService:
                         with open(target_path, 'w') as f:
                             f.write(response.text)
                     elif step_type == 'system_package':
-                        # Skip system package installation since we handle it in Dockerfile
+                        # Skip system package installation
                         logger.info(f"Skipping system package installation of {step['package']} (handled by Dockerfile)")
+                        continue
 
                     completed_steps += 1
                     step_duration = time.time() - step_start
