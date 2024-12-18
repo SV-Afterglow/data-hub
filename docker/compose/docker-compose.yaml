@@ -3,7 +3,7 @@ version: '3.8'
 services:
   signalk:
     build:
-      context: .
+      context: ../..  # Go up two levels from docker/compose
       dockerfile: docker/signalk/Dockerfile
     image: ghcr.io/sv-afterglow/data-hub/signalk:latest
     restart: always
@@ -16,7 +16,7 @@ services:
 
   influxdb:
     build:
-      context: .
+      context: ../..
       dockerfile: docker/influxdb/Dockerfile
     image: ghcr.io/sv-afterglow/data-hub/influxdb:latest
     restart: always
@@ -32,7 +32,7 @@ services:
 
   grafana:
     build:
-      context: .
+      context: ../..
       dockerfile: docker/grafana/Dockerfile
     image: ghcr.io/sv-afterglow/data-hub/grafana:latest
     restart: always
@@ -49,7 +49,7 @@ services:
 
   system-metrics:
     build:
-      context: .
+      context: ../..
       dockerfile: docker/system-metrics/Dockerfile
     restart: always
     volumes:
@@ -65,18 +65,20 @@ services:
 
   update-service:
     build:
-      context: .
+      context: ../..
       dockerfile: docker/update-service/Dockerfile
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc:/etc:ro
       - ~/.data-hub:/data
+      - ../..:/app/data-hub  # Mount repo root for access to Dockerfiles
     environment:
       - GITHUB_REPO=sv-afterglow/data-hub
       - GITHUB_BRANCH=main
       - UPDATE_CHECK_INTERVAL=3600
       - INFLUX_URL=http://influxdb:8086
+      - DATA_DIR=/app  # Set data dir to container working directory
     networks:
       - data-hub
 
