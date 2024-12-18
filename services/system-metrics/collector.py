@@ -3,7 +3,17 @@
 import os
 import time
 import psutil
+import logging
+import sys
 from influxdb import InfluxDBClient
+
+# Setup logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
+logger = logging.getLogger('system-metrics')
 
 # InfluxDB configuration
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
@@ -14,6 +24,7 @@ INTERVAL = int(os.getenv('COLLECTION_INTERVAL', '10'))
 
 def get_system_metrics():
     """Collect system metrics."""
+    logger.debug("Collecting system metrics...")
     metrics = {
         # CPU metrics
         'cpu_percent': psutil.cpu_percent(interval=1),
@@ -40,9 +51,11 @@ def get_system_metrics():
         with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
             temp = float(f.read().strip()) / 1000.0
             metrics['cpu_temperature'] = temp
-    except:
+    except Exception as e:
+        logger.warning(f"Could not read CPU temperature: {e}")
         metrics['cpu_temperature'] = 0
         
+    logger.debug(f"Collected metrics: {metrics}")
     return metrics
 
 def write_metrics(client, metrics):
@@ -56,37 +69,45 @@ def write_metrics(client, metrics):
     
     try:
         client.write_points(json_body)
-        print(f"Successfully wrote metrics to InfluxDB: {metrics}")
+        logger.info(f"Successfully wrote metrics to InfluxDB: {metrics}")
     except Exception as e:
-        print(f"Error writing to InfluxDB: {e}")
+        logger.error(f"Error writing to InfluxDB: {e}", exc_info=True)
 
 def main():
     """Main collection loop."""
-    print(f"Starting system metrics collector...")
-    print(f"InfluxDB URL: {INFLUX_URL}")
-    print(f"Collection interval: {INTERVAL} seconds")
+    logger.info("Starting system metrics collector...")
+    logger.info(f"InfluxDB URL: {INFLUX_URL}")
+    logger.info(f"Collection interval: {INTERVAL} seconds")
     
-    # Create InfluxDB client
-    client = InfluxDBClient(host='influxdb', port=8086)
-    
-    # Ensure database exists
-    databases = client.get_list_database()
-    if INFLUX_DB not in [db['name'] for db in databases]:
-        client.create_database(INFLUX_DB)
-        print(f"Created database: {INFLUX_DB}")
-    
-    client.switch_database(INFLUX_DB)
-    print(f"Connected to database: {INFLUX_DB}")
-    
-    # Main collection loop
-    while True:
-        try:
-            metrics = get_system_metrics()
-            write_metrics(client, metrics)
-        except Exception as e:
-            print(f"Error collecting metrics: {e}")
+    try:
+        # Create InfluxDB client
+        logger.debug("Creating InfluxDB client...")
+        client = InfluxDBClient(host='influxdb', port=8086)
         
-        time.sleep(INTERVAL)
+        # Ensure database exists
+        logger.debug("Checking databases...")
+        databases = client.get_list_database()
+        logger.debug(f"Found databases: {databases}")
+        
+        if INFLUX_DB not in [db['name'] for db in databases]:
+            logger.info(f"Creating database: {INFLUX_DB}")
+            client.create_database(INFLUX_DB)
+        
+        client.switch_database(INFLUX_DB)
+        logger.info(f"Connected to database: {INFLUX_DB}")
+        
+        # Main collection loop
+        while True:
+            try:
+                metrics = get_system_metrics()
+                write_metrics(client, metrics)
+            except Exception as e:
+                logger.error(f"Error in collection loop: {e}", exc_info=True)
+            
+            time.sleep(INTERVAL)
+    except Exception as e:
+        logger.error(f"Fatal error in main: {e}", exc_info=True)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
