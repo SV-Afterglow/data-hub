@@ -43,7 +43,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc:/etc:ro
       - ~/.data-hub:/data
-      - ~/data-hub:/home/admin/data-hub:ro
+      - .:/home/admin/data-hub
     environment:
       - GITHUB_REPO=sv-afterglow/data-hub
       - GITHUB_BRANCH=main
