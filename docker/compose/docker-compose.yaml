@@ -1,26 +1,51 @@
 version: '3.8'
 
 services:
-  update-service:
+  signalk:
     build:
       context: .
-      dockerfile: docker/update-service/Dockerfile
+      dockerfile: docker/signalk/Dockerfile
+    image: ghcr.io/sv-afterglow/data-hub/signalk:latest
     restart: always
+    network_mode: host  # Required for NMEA2000
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /etc:/etc:ro
-      - /home/admin/.data-hub:/data
-      - .:/home/admin/data-hub
-    environment:
-      - GITHUB_REPO=sv-afterglow/data-hub
-      - GITHUB_BRANCH=main
-      - UPDATE_CHECK_INTERVAL=3600
-      - INFLUX_URL=http://influxdb:8086
-      - HOME=/home/admin
-    networks:
-      - data-hub
+      - ~/.signalk:/home/node/.signalk
+      - /etc/localtime:/etc/localtime:ro
     depends_on:
       - influxdb
+
+  influxdb:
+    build:
+      context: .
+      dockerfile: docker/influxdb/Dockerfile
+    image: ghcr.io/sv-afterglow/data-hub/influxdb:latest
+    restart: always
+    ports:
+      - "8086:8086"
+    volumes:
+      - ~/influxdb-data:/var/lib/influxdb
+    environment:
+      - INFLUXDB_DB=signalk
+      - INFLUXDB_HTTP_AUTH_ENABLED=false
+    networks:
+      - data-hub
+
+  grafana:
+    build:
+      context: .
+      dockerfile: docker/grafana/Dockerfile
+    image: ghcr.io/sv-afterglow/data-hub/grafana:latest
+    restart: always
+    ports:
+      - "3001:3000"
+    volumes:
+      - ~/grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - influxdb
+    networks:
+      - data-hub
 
   system-metrics:
     build:
@@ -38,30 +63,20 @@ services:
     networks:
       - data-hub
 
-  influxdb:
-    image: influxdb:1.8
+  update-service:
+    build:
+      context: .
+      dockerfile: docker/update-service/Dockerfile
     restart: always
-    ports:
-      - "8086:8086"
     volumes:
-      - /home/admin/influxdb-data:/var/lib/influxdb
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc:/etc:ro
+      - ~/.data-hub:/data
     environment:
-      - INFLUXDB_DB=signalk
-      - INFLUXDB_HTTP_AUTH_ENABLED=false
-    networks:
-      - data-hub
-
-  grafana:
-    image: grafana/grafana:latest
-    restart: always
-    ports:
-      - "3001:3000"
-    volumes:
-      - /home/admin/grafana-data:/var/lib/grafana
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    depends_on:
-      - influxdb
+      - GITHUB_REPO=sv-afterglow/data-hub
+      - GITHUB_BRANCH=main
+      - UPDATE_CHECK_INTERVAL=3600
+      - INFLUX_URL=http://influxdb:8086
     networks:
       - data-hub
 
