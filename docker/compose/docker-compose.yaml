@@ -9,7 +9,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc:/etc:ro
-      - ~/.data-hub:/data
+      - /home/admin/.data-hub:/data
       - .:/home/admin/data-hub
     environment:
       - GITHUB_REPO=sv-afterglow/data-hub
@@ -44,7 +44,7 @@ services:
     ports:
       - "8086:8086"
     volumes:
-      - ~/influxdb-data:/var/lib/influxdb
+      - /home/admin/influxdb-data:/var/lib/influxdb
     environment:
       - INFLUXDB_DB=signalk
       - INFLUXDB_HTTP_AUTH_ENABLED=false
@@ -57,7 +57,7 @@ services:
     ports:
       - "3001:3000"
     volumes:
-      - ~/grafana-data:/var/lib/grafana
+      - /home/admin/grafana-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
