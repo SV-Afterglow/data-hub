@@ -28,9 +28,71 @@ echo "Downloading Dockerfiles..."
 curl -s "https://raw.githubusercontent.com/sv-afterglow/data-hub/main/docker/update-service/Dockerfile" > docker/update-service/Dockerfile
 curl -s "https://raw.githubusercontent.com/sv-afterglow/data-hub/main/docker/system-metrics/Dockerfile" > docker/system-metrics/Dockerfile
 
-# Download docker-compose.yml
-echo "Downloading docker-compose.yml..."
-curl -s "https://raw.githubusercontent.com/sv-afterglow/data-hub/main/docker/compose/docker-compose.yaml" > docker-compose.yml
+# Create docker-compose.yml with correct paths
+echo "Creating docker-compose.yml..."
+cat > docker-compose.yml << 'EOF'
+version: '3.8'
+
+services:
+  update-service:
+    build:
+      context: .
+      dockerfile: docker/update-service/Dockerfile
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc:/etc:ro
+      - ~/.data-hub:/data
+    environment:
+      - GITHUB_REPO=sv-afterglow/data-hub
+      - GITHUB_BRANCH=main
+      - UPDATE_CHECK_INTERVAL=3600
+      - INFLUX_URL=http://influxdb:8086
+
+  system-metrics:
+    build:
+      context: .
+      dockerfile: docker/system-metrics/Dockerfile
+    restart: always
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /sys/class/thermal:/sys/class/thermal:ro
+    environment:
+      - INFLUX_URL=http://influxdb:8086
+      - COLLECTION_INTERVAL=10
+    depends_on:
+      - influxdb
+
+  influxdb:
+    image: influxdb:1.8
+    restart: always
+    ports:
+      - "8086:8086"
+    volumes:
+      - ~/influxdb-data:/var/lib/influxdb
+    environment:
+      - INFLUXDB_DB=signalk
+      - INFLUXDB_HTTP_AUTH_ENABLED=false
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: always
+    ports:
+      - "3001:3000"
+    volumes:
+      - ~/grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - influxdb
+
+  watchtower:
+    image: containrrr/watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --cleanup --interval 30
+EOF
 
 # Make scripts executable
 chmod +x services/update-service/updater.py
