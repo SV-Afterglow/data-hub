@@ -3,14 +3,11 @@
 import os
 import time
 import psutil
-from influxdb_client import InfluxDBClient, Point
-from influxdb_client.client.write_api import SYNCHRONOUS
+from influxdb import InfluxDBClient
 
 # InfluxDB configuration
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
-INFLUX_TOKEN = os.getenv('INFLUX_TOKEN', '')  # Not needed if auth is disabled
-INFLUX_ORG = os.getenv('INFLUX_ORG', '')     # Not needed if auth is disabled
-INFLUX_BUCKET = "system_metrics"
+INFLUX_DB = "system_metrics"
 
 # Collection interval in seconds
 INTERVAL = int(os.getenv('COLLECTION_INTERVAL', '10'))
@@ -50,16 +47,15 @@ def get_system_metrics():
 
 def write_metrics(client, metrics):
     """Write metrics to InfluxDB."""
-    write_api = client.write_api(write_options=SYNCHRONOUS)
-    
-    point = Point("system_metrics")
-    
-    # Add all metrics as fields
-    for key, value in metrics.items():
-        point.field(key, value)
+    json_body = [
+        {
+            "measurement": "system_metrics",
+            "fields": metrics
+        }
+    ]
     
     try:
-        write_api.write(bucket=INFLUX_BUCKET, record=point)
+        client.write_points(json_body)
         print(f"Successfully wrote metrics to InfluxDB: {metrics}")
     except Exception as e:
         print(f"Error writing to InfluxDB: {e}")
@@ -71,16 +67,16 @@ def main():
     print(f"Collection interval: {INTERVAL} seconds")
     
     # Create InfluxDB client
-    client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
+    client = InfluxDBClient(host='influxdb', port=8086)
     
-    # Ensure bucket exists
-    try:
-        buckets_api = client.buckets_api()
-        if INFLUX_BUCKET not in [bucket.name for bucket in buckets_api.find_buckets()]:
-            buckets_api.create_bucket(bucket_name=INFLUX_BUCKET)
-            print(f"Created bucket: {INFLUX_BUCKET}")
-    except Exception as e:
-        print(f"Error checking/creating bucket: {e}")
+    # Ensure database exists
+    databases = client.get_list_database()
+    if INFLUX_DB not in [db['name'] for db in databases]:
+        client.create_database(INFLUX_DB)
+        print(f"Created database: {INFLUX_DB}")
+    
+    client.switch_database(INFLUX_DB)
+    print(f"Connected to database: {INFLUX_DB}")
     
     # Main collection loop
     while True:
