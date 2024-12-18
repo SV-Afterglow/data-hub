@@ -4,11 +4,11 @@ import os
 import time
 import yaml
 import docker
-import semver
 import requests
 import logging
 from pathlib import Path
 from datetime import datetime
+from packaging import version
 from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
 
@@ -26,6 +26,14 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger('update-service')
+
+def compare_versions(v1, v2):
+    """Compare two version strings."""
+    try:
+        return version.parse(v1) > version.parse(v2)
+    except Exception as e:
+        logger.error(f"Version comparison error: {e}")
+        return False
 
 class UpdateService:
     def __init__(self):
@@ -345,9 +353,9 @@ class UpdateService:
                               {"current_version": current_version,
                                "latest_version": latest_version or "unknown",
                                "update_available": bool(latest_version and 
-                                   semver.compare(latest_version, current_version) > 0)})
+                                   compare_versions(latest_version, current_version))})
 
-                if latest_version and semver.compare(latest_version, current_version) > 0:
+                if latest_version and compare_versions(latest_version, current_version):
                     logger.info(f"Update available: {current_version} -> {latest_version}")
                     
                     if self.apply_update(latest_version):
