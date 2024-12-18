@@ -240,9 +240,16 @@ class UpdateService:
                 if 'environment' in service_config:
                     run_kwargs['environment'] = service_config['environment']
 
-                # Add volumes
+                # Add volumes with absolute paths
                 if 'volumes' in service_config:
-                    run_kwargs['volumes'] = service_config['volumes']
+                    volumes = {}
+                    for volume in service_config['volumes']:
+                        host_path, container_path = volume.split(':')
+                        # Replace ~ with absolute path
+                        if host_path.startswith('~'):
+                            host_path = str(HOME_DIR) + host_path[1:]
+                        volumes[host_path] = {'bind': container_path, 'mode': 'rw'}
+                    run_kwargs['volumes'] = volumes
 
                 # Add ports
                 if 'ports' in service_config:
