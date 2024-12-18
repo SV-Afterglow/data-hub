@@ -30,23 +30,35 @@ fi
 echo "Creating directories..."
 mkdir -p ~/.data-hub/backups
 
+# Create temporary directory
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+echo "Setting up update service in $TMP_DIR"
+
+# Create service directory structure
+mkdir -p "$TMP_DIR/update-service"
+cd "$TMP_DIR/update-service"
+
 # Download the update service files
 echo "Downloading update service files..."
 REPO="sv-afterglow/data-hub"
 BRANCH="main"
 BASE_URL="https://raw.githubusercontent.com/$REPO/$BRANCH"
 
-# Create temporary directory
-TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
-
-# Download necessary files
-curl -s "$BASE_URL/services/update-service/requirements.txt" > "$TMP_DIR/requirements.txt"
-curl -s "$BASE_URL/services/update-service/updater.py" > "$TMP_DIR/updater.py"
+# Download files directly to the working directory
+curl -s "$BASE_URL/services/update-service/requirements.txt" > requirements.txt
+curl -s "$BASE_URL/services/update-service/updater.py" > updater.py
 curl -s "$BASE_URL/version.yml" > ~/.data-hub/version.yml
 
-# Create local Dockerfile that uses the downloaded files
-cat > "$TMP_DIR/Dockerfile" << 'EOF'
+# Verify downloads
+if [ ! -f requirements.txt ] || [ ! -f updater.py ]; then
+    echo -e "${RED}Failed to download required files${NC}"
+    exit 1
+fi
+
+# Create local Dockerfile
+cat > Dockerfile << 'EOF'
 FROM python:3.11-slim
 
 # Install system dependencies
@@ -70,8 +82,8 @@ RUN chmod +x updater.py
 CMD ["./updater.py"]
 EOF
 
-# Create docker-compose file for update service
-cat > "$TMP_DIR/docker-compose.yml" << EOF
+# Create docker-compose file
+cat > docker-compose.yml << EOF
 version: '3.8'
 
 services:
@@ -89,9 +101,12 @@ services:
       - UPDATE_CHECK_INTERVAL=3600
 EOF
 
+# List files for debugging
+echo "Files in build context:"
+ls -la
+
 # Build and start the update service
 echo "Building update service..."
-cd "$TMP_DIR"
 if ! docker-compose build; then
     echo -e "${RED}Failed to build update service${NC}"
     exit 1
@@ -113,5 +128,5 @@ echo -e "${YELLOW}Note: You may need to wait up to an hour for the first update 
 echo -e "${YELLOW}or you can restart the service to check immediately:${NC}"
 echo "docker-compose restart update-service"
 
-# Cleanup
+# Return to original directory
 cd - > /dev/null
