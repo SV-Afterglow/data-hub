@@ -55,6 +55,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /sys/class/thermal:/sys/class/thermal:ro
+      - ~/.data-hub:/data  # Mount data directory for updated collector.py
     environment:
       - INFLUX_URL=http://influxdb:8086
       - COLLECTION_INTERVAL=10
