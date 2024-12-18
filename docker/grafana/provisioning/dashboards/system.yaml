@@ -1,10 +1,3 @@
 apiVersion: 1
 
-providers:
-  - name: 'System Dashboards'
-    type: file
-    disableDeletion: true
-    updateIntervalSeconds: 10
-    allowUiUpdates: false
-    options:
-      path: /etc/grafana/provisioning/dashboards
+providers: []
