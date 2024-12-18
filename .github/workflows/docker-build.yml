@@ -6,6 +6,9 @@ on:
     paths:
       - 'docker/**'
       - '.github/workflows/docker-build.yml'
+      - 'version.yml'
+      - 'services/**'
+      - 'updates/**'
   workflow_dispatch:
 
 env:
@@ -13,11 +16,26 @@ env:
   REPOSITORY: ${{ github.repository }}
 
 jobs:
+  discover-services:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.set-services.outputs.services }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Get services from docker directory
+        id: set-services
+        run: |
+          SERVICES=$(ls docker/*/Dockerfile | cut -d'/' -f2 | jq -R -s -c 'split("\n")[:-1]')
+          echo "services=$SERVICES" >> $GITHUB_OUTPUT
+
   build-and-push:
+    needs: discover-services
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [signalk, influxdb, grafana]
+        service: ${{ fromJson(needs.discover-services.outputs.services) }}
     permissions:
       contents: read
       packages: write
