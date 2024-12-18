@@ -52,6 +52,8 @@ services:
       - HOME=/home/admin
     networks:
       - data-hub
+    depends_on:
+      - influxdb
 
   system-metrics:
     build:
@@ -81,6 +83,12 @@ services:
       - INFLUXDB_HTTP_AUTH_ENABLED=false
     networks:
       - data-hub
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
   grafana:
     image: grafana/grafana:latest
@@ -115,6 +123,21 @@ chmod +x services/update-service/updater.py
 chmod +x services/system-metrics/collector.py
 
 echo -e "${GREEN}Build environment setup complete!${NC}"
-echo -e "${YELLOW}You can now run:${NC}"
-echo "docker-compose build update-service"
-echo "docker-compose up -d"
+echo -e "${YELLOW}Starting services...${NC}"
+
+# Start InfluxDB first and wait for it to be healthy
+docker-compose up -d influxdb
+echo "Waiting for InfluxDB to be healthy..."
+until curl -s http://localhost:8086/ping > /dev/null; do
+    echo -n "."
+    sleep 1
+done
+echo -e "\nInfluxDB is ready"
+
+# Start the update service
+echo "Starting update service..."
+docker-compose up -d update-service
+
+echo -e "${GREEN}Services started!${NC}"
+echo -e "${YELLOW}To check the update service logs:${NC}"
+echo "docker-compose logs -f update-service"
