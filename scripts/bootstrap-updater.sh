@@ -50,7 +50,6 @@ curl -s "$BASE_URL/version.yml" > ~/.data-hub/version.yml
 # Create update service compose file
 cat > ~/.data-hub/update-service/docker-compose.yaml << EOF
 version: '3.8'
-name: data-hub
 services:
   update-service:
     build: .
@@ -107,7 +106,7 @@ fi
 # Build and start the update service
 echo "Building and starting update service..."
 cd ~/.data-hub/update-service
-if ! docker-compose up -d; then
+if ! docker-compose -p data-hub up -d; then
     echo -e "${RED}Failed to start update service${NC}"
     exit 1
 fi
@@ -119,7 +118,7 @@ echo "2. Download and apply updates automatically"
 echo "3. Handle rollbacks if updates fail"
 echo ""
 echo -e "${YELLOW}To check the update service logs:${NC}"
-echo "docker-compose -f ~/.data-hub/update-service/docker-compose.yaml logs -f"
+echo "docker-compose -f ~/.data-hub/update-service/docker-compose.yaml -p data-hub logs -f"
 echo ""
 echo -e "${YELLOW}To restart the service:${NC}"
-echo "docker-compose -f ~/.data-hub/update-service/docker-compose.yaml restart"
+echo "docker-compose -f ~/.data-hub/update-service/docker-compose.yaml -p data-hub restart"
