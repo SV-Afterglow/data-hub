@@ -4,10 +4,6 @@ release_date: "2024-01-11"
 description: "Added system-metrics service and monitoring capabilities"
 
 steps:
-  - type: "system_package"
-    package: "python3-psutil"
-    description: "Required for system metrics collection"
-
   - type: "docker_compose"
     description: "Update docker-compose.yml with system-metrics service"
 
