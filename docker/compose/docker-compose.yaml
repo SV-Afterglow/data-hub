@@ -40,6 +40,10 @@ services:
       - ~/grafana-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_PATHS_DATA=/var/lib/grafana
+      - GF_USERS_ALLOW_SIGN_UP=false
+    # Set the user to run as grafana user (472) and group (472)
+    user: "472:472"
     depends_on:
       - influxdb
 

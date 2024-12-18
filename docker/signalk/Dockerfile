@@ -3,12 +3,9 @@ FROM signalk/signalk-server:latest
 
 WORKDIR /home/node/.signalk
 
-# Install required plugins
-RUN npm install --unsafe-perm \
-    @signalk/nmea2000-reader \
-    @signalk/signalk-to-influxdb
-
 # Copy our custom configuration
+# Plugin configurations are managed in settings.json
+# Plugin binaries persist in the ~/.signalk volume mount
 COPY ./docker/signalk/config/settings.json /home/node/.signalk/
 
 # Health check
