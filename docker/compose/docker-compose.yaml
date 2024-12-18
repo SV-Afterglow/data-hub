@@ -72,13 +72,16 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc:/etc:ro
       - ~/.data-hub:/data
-      - ../..:/app/data-hub  # Mount repo root for access to Dockerfiles
+      - ../..:/app/repo  # Mount repo root for access to Dockerfiles
     environment:
       - GITHUB_REPO=sv-afterglow/data-hub
       - GITHUB_BRANCH=main
       - UPDATE_CHECK_INTERVAL=3600
       - INFLUX_URL=http://influxdb:8086
       - DATA_DIR=/app  # Set data dir to container working directory
+    depends_on:
+      - influxdb  # Ensure influxdb starts first
+    working_dir: /app/repo  # Set working directory to repo root
     networks:
       - data-hub
 
