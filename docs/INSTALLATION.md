@@ -96,26 +96,48 @@ The setup script will:
 
 ### 4. Post-Installation Configuration
 
+#### Network Access
+The Data Hub services can be accessed in two ways:
+1. Using the hostname: `data-hub.local`
+2. Using the IP address (shown at the end of setup)
+
+From another computer on the same network, you cannot use `localhost` - you must use either:
+- `http://data-hub.local:[PORT]`
+- `http://[IP_ADDRESS]:[PORT]`
+
+Service ports:
+- SignalK: 3000
+- Grafana: 3001
+- InfluxDB: 8086
+
 #### SignalK to InfluxDB Integration
-1. Access SignalK admin interface at http://data-hub.local:3000/admin
+1. Access SignalK admin interface at:
+   - `http://data-hub.local:3000/admin` or
+   - `http://[IP_ADDRESS]:3000/admin`
 2. Go to Server -> Plugin Config
 3. Find and install "@signalk/signalk-to-influxdb" plugin
 4. Configure the plugin:
-   - Host: influxdb
+   - Host: influxdb (use this exact name, NOT localhost)
    - Port: 8086
    - Database: signalk
    - Batch write: Enabled
    - Write interval: 1000 (1 second)
 
+Note: When configuring the InfluxDB connection in SignalK, use `influxdb` as the hostname. This is the Docker service name and will resolve correctly within the Docker network. Do not use localhost, data-hub.local, or IP addresses for this internal connection.
+
 #### Grafana Data Source Setup
-1. Access Grafana at http://data-hub.local:3001
+1. Access Grafana at:
+   - `http://data-hub.local:3001` or
+   - `http://[IP_ADDRESS]:3001`
    - Default login: admin/admin
 2. Add InfluxDB as data source:
    - Name: SignalK
    - Type: InfluxDB
-   - URL: http://influxdb:8086
+   - URL: http://influxdb:8086 (use this exact URL, NOT localhost)
    - Database: signalk
    - No authentication required
+
+Note: When configuring the InfluxDB data source in Grafana, use `http://influxdb:8086` as the URL. This is the Docker service name and will resolve correctly within the Docker network. Do not use localhost, data-hub.local, or IP addresses for this internal connection.
 
 ## Manual Installation Reference
 
@@ -199,8 +221,8 @@ sudo apt-get install -y \
    ```
 
 2. Access SignalK:
-   - Web: http://localhost:3000
-   - Admin: http://localhost:3000/admin
+   - Web: http://data-hub.local:3000
+   - Admin: http://data-hub.local:3000/admin
    - Configure NMEA2000 source in admin panel
 
 #### Grafana Setup
@@ -211,7 +233,7 @@ sudo apt-get install -y \
    ```
 
 2. Access Grafana:
-   - Web: http://localhost:3001
+   - Web: http://data-hub.local:3001
    - Default login: admin/admin
    - Add SignalK InfluxDB as data source
 
@@ -245,7 +267,7 @@ sudo apt-get install -y \
    docker logs signalk
    
    # Monitor NMEA2000 data in SignalK
-   http://localhost:3000/admin
+   http://data-hub.local:3000/admin
    ```
 
 4. Verify data storage:
@@ -254,8 +276,61 @@ sudo apt-get install -y \
    docker logs influxdb
    
    # Query recent data points
-   curl -G 'http://localhost:8086/query?db=signalk' --data-urlencode 'q=SELECT * FROM "signalk" ORDER BY time DESC LIMIT 5'
+   curl -G 'http://data-hub.local:8086/query?db=signalk' --data-urlencode 'q=SELECT * FROM "signalk" ORDER BY time DESC LIMIT 5'
    ```
+
+## Networking Notes
+
+### Internal vs External Access
+
+#### Internal Docker Communication
+Services within the Docker network should use the service names for communication:
+- SignalK → InfluxDB: Use `influxdb:8086`
+- Grafana → InfluxDB: Use `influxdb:8086`
+
+#### External Access
+Computers on your network should use:
+1. Hostname (recommended):
+   - SignalK: `http://data-hub.local:3000`
+   - Grafana: `http://data-hub.local:3001`
+   - InfluxDB: `http://data-hub.local:8086`
+
+2. IP Address (alternative):
+   - SignalK: `http://[IP_ADDRESS]:3000`
+   - Grafana: `http://[IP_ADDRESS]:3001`
+   - InfluxDB: `http://[IP_ADDRESS]:8086`
+
+Do not use `localhost` when accessing from another computer - it will not work.
+
+### Troubleshooting Network Access
+
+1. Cannot access using hostname:
+   ```bash
+   # On your computer, try to ping the Data Hub
+   ping data-hub.local
+   
+   # If this fails, try using the IP address instead
+   ping [IP_ADDRESS]
+   ```
+
+2. Cannot access using IP:
+   - Verify both devices are on the same network
+   - Check firewall settings on the Data Hub:
+     ```bash
+     sudo ufw status
+     ```
+   - Verify services are running:
+     ```bash
+     docker-compose ps
+     ```
+
+3. Services can't communicate:
+   - Verify you're using service names (e.g., `influxdb`) not `localhost`
+   - Check Docker network:
+     ```bash
+     docker network ls
+     docker network inspect data-hub_default
+     ```
 
 ## Troubleshooting
 
