@@ -17,6 +17,7 @@ GITHUB_REPO = os.getenv('GITHUB_REPO', 'sv-afterglow/data-hub')
 GITHUB_BRANCH = os.getenv('GITHUB_BRANCH', 'main')
 CHECK_INTERVAL = int(os.getenv('UPDATE_CHECK_INTERVAL', '3600'))  # Default 1 hour
 DATA_DIR = Path(os.getenv('DATA_DIR', '/data'))
+COMPOSE_DIR = Path('/data/docker/compose')  # Fixed path for compose files
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
 INFLUX_BUCKET = "system_updates"
 
@@ -41,7 +42,7 @@ class UpdateService:
         self.influx_client = InfluxDBClient(url=INFLUX_URL)
         self.version_file = DATA_DIR / 'version.yml'
         self.backup_dir = DATA_DIR / 'backups'
-        self.compose_file = DATA_DIR / 'docker-compose.yml'
+        self.compose_file = COMPOSE_DIR / 'docker-compose.yaml'  # Updated path
         self.ensure_directories()
         self.setup_influxdb()
 
@@ -49,6 +50,7 @@ class UpdateService:
         """Ensure required directories exist."""
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
+        COMPOSE_DIR.mkdir(parents=True, exist_ok=True)
 
     def setup_influxdb(self):
         """Setup InfluxDB bucket for update metrics."""
@@ -66,12 +68,10 @@ class UpdateService:
             write_api = self.influx_client.write_api(write_options=SYNCHRONOUS)
             point = Point(measurement)
             
-            # Add tags
             if tags:
                 for key, value in tags.items():
                     point = point.tag(key, str(value))
             
-            # Add fields
             for key, value in fields.items():
                 if isinstance(value, bool):
                     point = point.field(key, value)
@@ -126,7 +126,7 @@ class UpdateService:
         
         try:
             # Backup docker-compose config
-            compose_backup = backup_path / 'docker-compose.yml'
+            compose_backup = backup_path / 'docker-compose.yaml'  # Updated extension
             compose_backup.parent.mkdir(parents=True, exist_ok=True)
             if self.compose_file.exists():
                 with open(self.compose_file, 'r') as src:
@@ -136,8 +136,7 @@ class UpdateService:
             # Backup service configurations
             config_backup = backup_path / 'configs'
             config_backup.mkdir(parents=True, exist_ok=True)
-            # Add specific config backup logic here
-
+            
             self.log_metric("system_backup", 
                           {"success": True, "path": str(backup_path)},
                           {"type": "pre_update"})
@@ -204,7 +203,7 @@ class UpdateService:
             start_time = time.time()
             
             # Restore docker-compose config
-            compose_backup = Path(backup_path) / 'docker-compose.yml'
+            compose_backup = Path(backup_path) / 'docker-compose.yaml'  # Updated extension
             if compose_backup.exists():
                 with open(compose_backup, 'r') as src:
                     with open(self.compose_file, 'w') as dst:
@@ -216,8 +215,8 @@ class UpdateService:
                 # Add specific config restore logic here
                 pass
 
-            # Restart services
-            os.system('docker-compose up -d')
+            # Restart services using the correct compose file path
+            os.system(f'docker-compose -f {self.compose_file} up -d')
             
             duration = time.time() - start_time
             self.log_metric("rollback",
@@ -276,8 +275,9 @@ class UpdateService:
                         config_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/{step['path']}"
                         response = requests.get(config_url)
                         response.raise_for_status()
-                        os.makedirs(os.path.dirname(step['target']), exist_ok=True)
-                        with open(step['target'], 'w') as f:
+                        target_path = DATA_DIR / step['target'].lstrip('/data/')
+                        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                        with open(target_path, 'w') as f:
                             f.write(response.text)
 
                     completed_steps += 1
@@ -305,8 +305,8 @@ class UpdateService:
             with open(self.version_file, 'w') as f:
                 yaml.dump({'version': version}, f)
 
-            # Restart services
-            os.system('docker-compose up -d')
+            # Restart services using the correct compose file path
+            os.system(f'docker-compose -f {self.compose_file} up -d')
 
             # Verify update
             if not self.verify_update(version):
