@@ -206,8 +206,8 @@ class UpdateService:
                 # Add specific config restore logic here
                 pass
 
-            # Restart services using docker-compose command
-            os.system(f'cd {COMPOSE_FILE.parent} && docker-compose up -d')
+            # Restart services using docker compose command
+            os.system(f'cd {COMPOSE_FILE.parent} && docker compose up -d')
             
             duration = time.time() - start_time
             self.log_metric("rollback",
@@ -252,13 +252,7 @@ class UpdateService:
                 step_start = time.time()
                 step_type = step['type']
                 try:
-                    if step_type == 'system_package':
-                        # Update package lists and install package
-                        os.system("apt-get update")
-                        result = os.system(f"apt-get install -y {step['package']}")
-                        if result != 0:
-                            raise Exception(f"Failed to install package {step['package']}")
-                    elif step_type == 'docker_compose':
+                    if step_type == 'docker_compose':
                         # Update docker-compose.yml from the template in docker/compose/
                         compose_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/docker/compose/docker-compose.yaml"
                         response = requests.get(compose_url)
@@ -300,8 +294,8 @@ class UpdateService:
             with open(self.version_file, 'w') as f:
                 yaml.dump({'version': version}, f)
 
-            # Restart services using docker-compose command
-            os.system(f'cd {COMPOSE_FILE.parent} && docker-compose up -d')
+            # Restart services using docker compose command
+            os.system(f'cd {COMPOSE_FILE.parent} && docker compose up -d')
 
             # Verify update
             if not self.verify_update(version):
