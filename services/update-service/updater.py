@@ -21,6 +21,7 @@ HOME_DIR = Path(os.path.expanduser('~'))
 COMPOSE_FILE = HOME_DIR / 'data-hub/docker-compose.yml'  # Main compose file
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
 INFLUX_DB = "system_updates"
+NETWORK_NAME = 'data-hub_data-hub'
 
 # Setup logging with more detail
 logging.basicConfig(
@@ -62,6 +63,19 @@ class UpdateService:
             self.influx_client.switch_database(INFLUX_DB)
         except Exception as e:
             logger.error(f"Error setting up InfluxDB: {e}")
+
+    def ensure_network(self):
+        """Ensure the Docker network exists."""
+        try:
+            networks = self.docker_client.networks.list(names=[NETWORK_NAME])
+            if not networks:
+                logger.debug(f"Creating network {NETWORK_NAME}")
+                self.docker_client.networks.create(NETWORK_NAME, driver='bridge')
+            else:
+                logger.debug(f"Network {NETWORK_NAME} already exists")
+        except Exception as e:
+            logger.error(f"Failed to ensure network: {e}")
+            raise
 
     def log_metric(self, measurement, fields, tags=None):
         """Log a metric to InfluxDB."""
@@ -201,6 +215,9 @@ class UpdateService:
             # Only restart InfluxDB, not ourselves
             services_to_restart = {'influxdb'}
 
+            # Ensure network exists
+            self.ensure_network()
+
             # Stop and remove existing containers
             for service in services_to_restart:
                 container_name = f"data-hub_{service}_1"
@@ -263,7 +280,7 @@ class UpdateService:
                 if 'network_mode' in service_config:
                     run_kwargs['network_mode'] = service_config['network_mode']
                 elif 'networks' in service_config:
-                    run_kwargs['network'] = 'data-hub_data-hub'
+                    run_kwargs['network'] = NETWORK_NAME
 
                 # Add command if specified
                 if 'command' in service_config:
