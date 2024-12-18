@@ -17,16 +17,12 @@ COPY services/update-service/requirements.txt .
 ENV MSGPACK_PUREPYTHON=1
 
 # Install dependencies including psutil
-RUN pip install --no-cache-dir -r requirements.txt psutil
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy service code
 COPY services/update-service/updater.py .
 
 # Make script executable
 RUN chmod +x updater.py
-
-# Add docker group to avoid permission issues
-RUN groupadd -g 999 docker && \
-    usermod -aG docker root
 
 CMD ["./updater.py"]
