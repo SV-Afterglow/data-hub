@@ -73,44 +73,65 @@ RUN chmod +x updater.py
 CMD ["./updater.py"]
 EOF
 
-# Add update service to main docker-compose.yml
-echo "Adding update service to docker-compose.yml..."
-if [ -f docker-compose.yml ]; then
-    # Check if update-service is already in the file
-    if ! grep -q "update-service:" docker-compose.yml; then
-        # Add two newlines and the update-service configuration
-        echo -e "\n  update-service:\n\
-    build:\n\
-      context: ~/.data-hub/update-service\n\
-      dockerfile: Dockerfile\n\
-    image: ghcr.io/sv-afterglow/data-hub/update-service:latest\n\
-    restart: always\n\
-    volumes:\n\
-      - /var/run/docker.sock:/var/run/docker.sock\n\
-      - /etc:/etc:ro\n\
-      - ~/.data-hub:/data\n\
-    environment:\n\
-      - GITHUB_REPO=sv-afterglow/data-hub\n\
-      - GITHUB_BRANCH=main\n\
-      - UPDATE_CHECK_INTERVAL=3600" >> docker-compose.yml
-    fi
-else
-    echo -e "${RED}docker-compose.yml not found in current directory${NC}"
+# Create temporary docker-compose file for building
+cat > ~/.data-hub/update-service/docker-compose.build.yml << EOF
+version: '3.8'
+services:
+  update-service:
+    build: .
+    image: ghcr.io/sv-afterglow/data-hub/update-service:latest
+EOF
+
+# Build the image first
+echo "Building update service..."
+cd ~/.data-hub/update-service
+if ! docker-compose -f docker-compose.build.yml build; then
+    echo -e "${RED}Failed to build update service${NC}"
     exit 1
 fi
 
-# Build and start the update service
-echo "Building update service..."
-if ! docker-compose build update-service; then
-    echo -e "${RED}Failed to build update service${NC}"
+# Return to original directory
+cd - > /dev/null
+
+# Add update service to main docker-compose.yml
+echo "Adding update service to docker-compose.yml..."
+if [ -f docker-compose.yml ]; then
+    # Create backup of original docker-compose.yml
+    cp docker-compose.yml docker-compose.yml.bak
+    
+    # Remove any existing update-service configuration
+    sed -i '/update-service:/,/^[^ ]/d' docker-compose.yml
+    
+    # Add update-service configuration
+    cat >> docker-compose.yml << EOF
+
+  update-service:
+    image: ghcr.io/sv-afterglow/data-hub/update-service:latest
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc:/etc:ro
+      - ~/.data-hub:/data
+    environment:
+      - GITHUB_REPO=sv-afterglow/data-hub
+      - GITHUB_BRANCH=main
+      - UPDATE_CHECK_INTERVAL=3600
+EOF
+else
+    echo -e "${RED}docker-compose.yml not found in current directory${NC}"
     exit 1
 fi
 
 echo "Starting update service..."
 if ! docker-compose up -d update-service; then
     echo -e "${RED}Failed to start update service${NC}"
+    # Restore backup if start failed
+    mv docker-compose.yml.bak docker-compose.yml
     exit 1
 fi
+
+# Clean up backup if everything succeeded
+rm -f docker-compose.yml.bak
 
 echo -e "${GREEN}Update service successfully installed!${NC}"
 echo "The update service will now:"
@@ -118,6 +139,8 @@ echo "1. Check for updates every hour"
 echo "2. Download and apply updates automatically"
 echo "3. Handle rollbacks if updates fail"
 echo ""
-echo -e "${YELLOW}Note: You may need to wait up to an hour for the first update check,${NC}"
-echo -e "${YELLOW}or you can restart the service to check immediately:${NC}"
+echo -e "${YELLOW}To check the update service logs:${NC}"
+echo "docker-compose logs -f update-service"
+echo ""
+echo -e "${YELLOW}To restart the service:${NC}"
 echo "docker-compose restart update-service"
