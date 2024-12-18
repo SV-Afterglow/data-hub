@@ -43,11 +43,15 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc:/etc:ro
       - ~/.data-hub:/data
+      - ~/data-hub:/home/admin/data-hub:ro
     environment:
       - GITHUB_REPO=sv-afterglow/data-hub
       - GITHUB_BRANCH=main
       - UPDATE_CHECK_INTERVAL=3600
       - INFLUX_URL=http://influxdb:8086
+      - HOME=/home/admin
+    networks:
+      - data-hub
 
   system-metrics:
     build:
@@ -62,6 +66,8 @@ services:
       - COLLECTION_INTERVAL=10
     depends_on:
       - influxdb
+    networks:
+      - data-hub
 
   influxdb:
     image: influxdb:1.8
@@ -73,6 +79,8 @@ services:
     environment:
       - INFLUXDB_DB=signalk
       - INFLUXDB_HTTP_AUTH_ENABLED=false
+    networks:
+      - data-hub
 
   grafana:
     image: grafana/grafana:latest
@@ -85,6 +93,8 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
       - influxdb
+    networks:
+      - data-hub
 
   watchtower:
     image: containrrr/watchtower
@@ -92,6 +102,12 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command: --cleanup --interval 30
+    networks:
+      - data-hub
+
+networks:
+  data-hub:
+    driver: bridge
 EOF
 
 # Make scripts executable

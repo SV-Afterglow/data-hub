@@ -242,16 +242,30 @@ class UpdateService:
                 # Add network mode if specified
                 if 'network_mode' in service_config:
                     run_kwargs['network_mode'] = service_config['network_mode']
+                elif 'networks' in service_config:
+                    run_kwargs['network'] = 'data-hub_data-hub'
 
                 # Add command if specified
                 if 'command' in service_config:
                     run_kwargs['command'] = service_config['command']
 
                 try:
-                    self.docker_client.containers.run(
-                        service_config.get('image'),
-                        **run_kwargs
-                    )
+                    if 'build' in service_config:
+                        # Build the image locally
+                        context = service_config['build'].get('context', '.')
+                        dockerfile = service_config['build'].get('dockerfile')
+                        tag = f"data-hub_{service_name}:latest"
+                        
+                        self.docker_client.images.build(
+                            path=str(COMPOSE_FILE.parent / context),
+                            dockerfile=str(COMPOSE_FILE.parent / dockerfile) if dockerfile else None,
+                            tag=tag
+                        )
+                        run_kwargs['image'] = tag
+                    else:
+                        run_kwargs['image'] = service_config['image']
+
+                    self.docker_client.containers.run(**run_kwargs)
                 except Exception as e:
                     logger.error(f"Failed to start {service_name}: {e}")
                     raise
@@ -347,14 +361,8 @@ class UpdateService:
                         with open(target_path, 'w') as f:
                             f.write(response.text)
                     elif step_type == 'system_package':
-                        # Install system package using apt-get
-                        cmd = f"apt-get update && apt-get install -y {step['package']}"
-                        result = subprocess.run(['apt-get', 'update'], capture_output=True, text=True)
-                        if result.returncode != 0:
-                            raise Exception(f"apt-get update failed: {result.stderr}")
-                        result = subprocess.run(['apt-get', 'install', '-y', step['package']], capture_output=True, text=True)
-                        if result.returncode != 0:
-                            raise Exception(f"Package installation failed: {result.stderr}")
+                        # Skip system package installation since we handle it in Dockerfile
+                        logger.info(f"Skipping system package installation of {step['package']} (handled by Dockerfile)")
 
                     completed_steps += 1
                     step_duration = time.time() - step_start
