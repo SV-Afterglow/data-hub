@@ -29,25 +29,7 @@ fi
 # Create required directories
 echo "Creating directories..."
 mkdir -p ~/.data-hub/backups
-
-# Create temporary directory
-TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
-
-echo "Setting up update service in $TMP_DIR"
-
-# Create service directory structure
-mkdir -p "$TMP_DIR/update-service"
-cd "$TMP_DIR/update-service"
-
-# Create requirements.txt directly instead of downloading
-cat > requirements.txt << EOF
-pyyaml>=6.0.1
-docker>=6.1.3
-requests>=2.31.0
-influxdb-client>=1.36.1
-semver>=3.0.0
-EOF
+mkdir -p ~/.data-hub/update-service
 
 # Download the update service files
 echo "Downloading update service files..."
@@ -55,18 +37,19 @@ REPO="sv-afterglow/data-hub"
 BRANCH="main"
 BASE_URL="https://raw.githubusercontent.com/$REPO/$BRANCH"
 
-# Download updater.py
-curl -s "$BASE_URL/services/update-service/updater.py" > updater.py
+# Download files to the permanent location
+curl -s "$BASE_URL/services/update-service/requirements.txt" > ~/.data-hub/update-service/requirements.txt
+curl -s "$BASE_URL/services/update-service/updater.py" > ~/.data-hub/update-service/updater.py
 curl -s "$BASE_URL/version.yml" > ~/.data-hub/version.yml
 
 # Verify downloads
-if [ ! -f updater.py ]; then
+if [ ! -f ~/.data-hub/update-service/requirements.txt ] || [ ! -f ~/.data-hub/update-service/updater.py ]; then
     echo -e "${RED}Failed to download required files${NC}"
     exit 1
 fi
 
-# Create local Dockerfile
-cat > Dockerfile << 'EOF'
+# Create Dockerfile in the update-service directory
+cat > ~/.data-hub/update-service/Dockerfile << 'EOF'
 FROM python:3.11-slim
 
 # Install system dependencies
@@ -90,38 +73,41 @@ RUN chmod +x updater.py
 CMD ["./updater.py"]
 EOF
 
-# Create docker-compose file
-cat > docker-compose.yml << EOF
-version: '3.8'
-
-services:
-  update-service:
-    build: .
-    image: ghcr.io/sv-afterglow/data-hub/update-service:latest
-    restart: always
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /etc:/etc:ro
-      - ~/.data-hub:/data
-    environment:
-      - GITHUB_REPO=sv-afterglow/data-hub
-      - GITHUB_BRANCH=main
-      - UPDATE_CHECK_INTERVAL=3600
-EOF
-
-# List files for debugging
-echo "Files in build context:"
-ls -la
+# Add update service to main docker-compose.yml
+echo "Adding update service to docker-compose.yml..."
+if [ -f docker-compose.yml ]; then
+    # Check if update-service is already in the file
+    if ! grep -q "update-service:" docker-compose.yml; then
+        # Add two newlines and the update-service configuration
+        echo -e "\n  update-service:\n\
+    build:\n\
+      context: ~/.data-hub/update-service\n\
+      dockerfile: Dockerfile\n\
+    image: ghcr.io/sv-afterglow/data-hub/update-service:latest\n\
+    restart: always\n\
+    volumes:\n\
+      - /var/run/docker.sock:/var/run/docker.sock\n\
+      - /etc:/etc:ro\n\
+      - ~/.data-hub:/data\n\
+    environment:\n\
+      - GITHUB_REPO=sv-afterglow/data-hub\n\
+      - GITHUB_BRANCH=main\n\
+      - UPDATE_CHECK_INTERVAL=3600" >> docker-compose.yml
+    fi
+else
+    echo -e "${RED}docker-compose.yml not found in current directory${NC}"
+    exit 1
+fi
 
 # Build and start the update service
 echo "Building update service..."
-if ! docker-compose build; then
+if ! docker-compose build update-service; then
     echo -e "${RED}Failed to build update service${NC}"
     exit 1
 fi
 
 echo "Starting update service..."
-if ! docker-compose up -d; then
+if ! docker-compose up -d update-service; then
     echo -e "${RED}Failed to start update service${NC}"
     exit 1
 fi
@@ -135,6 +121,3 @@ echo ""
 echo -e "${YELLOW}Note: You may need to wait up to an hour for the first update check,${NC}"
 echo -e "${YELLOW}or you can restart the service to check immediately:${NC}"
 echo "docker-compose restart update-service"
-
-# Return to original directory
-cd - > /dev/null
