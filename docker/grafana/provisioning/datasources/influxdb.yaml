@@ -3,11 +3,10 @@ apiVersion: 1
 datasources:
   - name: InfluxDB
     type: influxdb
-    access: server
+    access: proxy
     url: http://influxdb:8086
-    database: signalk
+    database: system_metrics
     isDefault: true
-    editable: true
-    version: 1
+    editable: false
     jsonData:
-      httpMode: POST
+      httpMode: GET
