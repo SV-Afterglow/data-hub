@@ -22,17 +22,17 @@ COPY services/system-metrics/collector.py ./collector.py.default
 # Make script executable
 RUN chmod +x collector.py.default
 
-# Use the mounted collector.py if it exists, otherwise use the default one
+# Use the mounted collector.py if it exists, otherwise use default
 CMD ["sh", "-c", "\
     if [ -f /data/services/system-metrics/collector.py ]; then \
         echo 'Found mounted collector.py, using it...'; \
         cp /data/services/system-metrics/collector.py ./collector.py; \
         chmod +x ./collector.py; \
-        cat ./collector.py; \
-        ./collector.py; \
     else \
         echo 'No mounted collector.py found, using default...'; \
         cp ./collector.py.default ./collector.py; \
-        chmod +x ./collector.py; \
-        ./collector.py; \
-    fi"]
+    fi; \
+    echo 'Contents of collector.py:'; \
+    cat ./collector.py; \
+    echo 'Starting collector...'; \
+    ./collector.py"]
