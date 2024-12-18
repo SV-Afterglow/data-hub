@@ -3,17 +3,8 @@
 import os
 import time
 import psutil
-import logging
-import sys
+import socket
 from influxdb import InfluxDBClient
-
-# Setup logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    stream=sys.stdout
-)
-logger = logging.getLogger('system-metrics')
 
 # InfluxDB configuration
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
@@ -24,90 +15,135 @@ INTERVAL = int(os.getenv('COLLECTION_INTERVAL', '10'))
 
 def get_system_metrics():
     """Collect system metrics."""
-    logger.debug("Collecting system metrics...")
-    metrics = {
-        # CPU metrics
+    hostname = socket.gethostname()
+    timestamp = int(time.time() * 1e9)  # Convert to nanoseconds for InfluxDB
+    
+    metrics = []
+    
+    # CPU metrics
+    cpu_metrics = {
         'cpu_percent': psutil.cpu_percent(interval=1),
         'cpu_freq': psutil.cpu_freq().current if psutil.cpu_freq() else 0,
+    }
+    metrics.append({
+        "measurement": "cpu",
+        "tags": {
+            "host": hostname,
+            "metric_type": "usage"
+        },
+        "time": timestamp,
+        "fields": cpu_metrics
+    })
+    
+    # Load average metrics
+    load_metrics = {
         'load_1min': psutil.getloadavg()[0],
         'load_5min': psutil.getloadavg()[1],
-        'load_15min': psutil.getloadavg()[2],
-        
-        # Memory metrics
-        'memory_total': psutil.virtual_memory().total,
-        'memory_available': psutil.virtual_memory().available,
-        'memory_used': psutil.virtual_memory().used,
-        'memory_percent': psutil.virtual_memory().percent,
-        
-        # Disk metrics
-        'disk_total': psutil.disk_usage('/').total,
-        'disk_used': psutil.disk_usage('/').used,
-        'disk_free': psutil.disk_usage('/').free,
-        'disk_percent': psutil.disk_usage('/').percent,
+        'load_15min': psutil.getloadavg()[2]
     }
+    metrics.append({
+        "measurement": "system_load",
+        "tags": {
+            "host": hostname,
+            "metric_type": "load_average"
+        },
+        "time": timestamp,
+        "fields": load_metrics
+    })
     
-    # Get CPU temperature on Raspberry Pi
+    # Memory metrics
+    memory = psutil.virtual_memory()
+    memory_metrics = {
+        'total': memory.total,
+        'available': memory.available,
+        'used': memory.used,
+        'percent': memory.percent
+    }
+    metrics.append({
+        "measurement": "memory",
+        "tags": {
+            "host": hostname,
+            "metric_type": "usage"
+        },
+        "time": timestamp,
+        "fields": memory_metrics
+    })
+    
+    # Disk metrics
+    disk = psutil.disk_usage('/')
+    disk_metrics = {
+        'total': disk.total,
+        'used': disk.used,
+        'free': disk.free,
+        'percent': disk.percent
+    }
+    metrics.append({
+        "measurement": "disk",
+        "tags": {
+            "host": hostname,
+            "device": "/",
+            "metric_type": "usage"
+        },
+        "time": timestamp,
+        "fields": disk_metrics
+    })
+    
+    # CPU temperature (Raspberry Pi)
     try:
         with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
             temp = float(f.read().strip()) / 1000.0
-            metrics['cpu_temperature'] = temp
-    except Exception as e:
-        logger.warning(f"Could not read CPU temperature: {e}")
-        metrics['cpu_temperature'] = 0
+            metrics.append({
+                "measurement": "temperature",
+                "tags": {
+                    "host": hostname,
+                    "sensor": "cpu",
+                    "metric_type": "temperature"
+                },
+                "time": timestamp,
+                "fields": {
+                    "celsius": temp
+                }
+            })
+    except:
+        pass
         
-    logger.debug(f"Collected metrics: {metrics}")
     return metrics
 
 def write_metrics(client, metrics):
     """Write metrics to InfluxDB."""
-    json_body = [
-        {
-            "measurement": "system_metrics",
-            "fields": metrics
-        }
-    ]
-    
     try:
-        client.write_points(json_body)
-        logger.info(f"Successfully wrote metrics to InfluxDB: {metrics}")
+        client.write_points(metrics)
+        print(f"Successfully wrote {len(metrics)} metrics to InfluxDB")
     except Exception as e:
-        logger.error(f"Error writing to InfluxDB: {e}", exc_info=True)
+        print(f"Error writing to InfluxDB: {e}")
 
 def main():
     """Main collection loop."""
-    logger.info("Starting system metrics collector...")
-    logger.info(f"InfluxDB URL: {INFLUX_URL}")
-    logger.info(f"Collection interval: {INTERVAL} seconds")
+    print(f"Starting system metrics collector...")
+    print(f"InfluxDB URL: {INFLUX_URL}")
+    print(f"Collection interval: {INTERVAL} seconds")
     
-    try:
-        # Create InfluxDB client
-        logger.debug("Creating InfluxDB client...")
-        client = InfluxDBClient(host='influxdb', port=8086)
+    # Create InfluxDB client
+    client = InfluxDBClient(host='influxdb', port=8086)
+    
+    # Ensure database exists
+    databases = client.get_list_database()
+    if INFLUX_DB not in [db['name'] for db in databases]:
+        client.create_database(INFLUX_DB)
+        print(f"Created database: {INFLUX_DB}")
+    
+    client.switch_database(INFLUX_DB)
+    print(f"Connected to database: {INFLUX_DB}")
+    
+    # Main collection loop
+    while True:
+        try:
+            metrics = get_system_metrics()
+            write_metrics(client, metrics)
+        except Exception as e:
+            print(f"Error collecting metrics: {e}")
         
-        # Ensure database exists
-        logger.debug("Checking databases...")
-        databases = client.get_list_database()
-        logger.debug(f"Found databases: {databases}")
-        
-        if INFLUX_DB not in [db['name'] for db in databases]:
-            logger.info(f"Creating database: {INFLUX_DB}")
-            client.create_database(INFLUX_DB)
-        
-        client.switch_database(INFLUX_DB)
-        logger.info(f"Connected to database: {INFLUX_DB}")
-        
-        # Main collection loop
-        while True:
-            try:
-                metrics = get_system_metrics()
-                write_metrics(client, metrics)
-            except Exception as e:
-                logger.error(f"Error in collection loop: {e}", exc_info=True)
-            
-            time.sleep(INTERVAL)
-    except Exception as e:
-        logger.error(f"Fatal error in main: {e}", exc_info=True)
-        sys.exit(1)
+        time.sleep(INTERVAL)
 
 if __name__ == "__main__":
     main()
