@@ -4,6 +4,7 @@ import os
 import time
 import psutil
 import socket
+import logging
 from influxdb import InfluxDBClient
 
 # InfluxDB configuration
@@ -12,6 +13,13 @@ INFLUX_DB = "system_metrics"
 
 # Collection interval in seconds
 INTERVAL = int(os.getenv('COLLECTION_INTERVAL', '10'))
+
+# Setup logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 def get_system_metrics():
     """Collect system metrics."""
@@ -113,35 +121,41 @@ def write_metrics(client, metrics):
     """Write metrics to InfluxDB."""
     try:
         client.write_points(metrics)
-        print(f"Successfully wrote {len(metrics)} metrics to InfluxDB")
+        # Log each measurement separately
+        for metric in metrics:
+            logger.info(f"Wrote {metric['measurement']} metrics: {metric['fields']}")
     except Exception as e:
-        print(f"Error writing to InfluxDB: {e}")
+        logger.error(f"Error writing to InfluxDB: {e}")
 
 def main():
     """Main collection loop."""
-    print(f"Starting system metrics collector...")
-    print(f"InfluxDB URL: {INFLUX_URL}")
-    print(f"Collection interval: {INTERVAL} seconds")
+    logger.info("Starting system metrics collector...")
+    logger.info(f"InfluxDB URL: {INFLUX_URL}")
+    logger.info(f"Collection interval: {INTERVAL} seconds")
     
     # Create InfluxDB client
+    logger.debug("Creating InfluxDB client...")
     client = InfluxDBClient(host='influxdb', port=8086)
     
     # Ensure database exists
+    logger.debug("Checking databases...")
     databases = client.get_list_database()
+    logger.debug(f"Found databases: {databases}")
     if INFLUX_DB not in [db['name'] for db in databases]:
         client.create_database(INFLUX_DB)
-        print(f"Created database: {INFLUX_DB}")
+        logger.info(f"Created database: {INFLUX_DB}")
     
     client.switch_database(INFLUX_DB)
-    print(f"Connected to database: {INFLUX_DB}")
+    logger.info(f"Connected to database: {INFLUX_DB}")
     
     # Main collection loop
     while True:
         try:
+            logger.debug("Collecting system metrics...")
             metrics = get_system_metrics()
             write_metrics(client, metrics)
         except Exception as e:
-            print(f"Error collecting metrics: {e}")
+            logger.error(f"Error collecting metrics: {e}")
         
         time.sleep(INTERVAL)
 
