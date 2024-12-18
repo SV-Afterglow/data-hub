@@ -42,10 +42,40 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_PATHS_DATA=/var/lib/grafana
       - GF_USERS_ALLOW_SIGN_UP=false
-    # Set the user to run as grafana user (472) and group (472)
     user: "472:472"
     depends_on:
       - influxdb
+
+  system-metrics:
+    build:
+      context: ..
+      dockerfile: docker/system-metrics/Dockerfile
+    image: ghcr.io/sv-afterglow/data-hub/system-metrics:latest
+    restart: always
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /sys/class/thermal:/sys/class/thermal:ro
+    environment:
+      - INFLUX_URL=http://influxdb:8086
+      - COLLECTION_INTERVAL=10
+    depends_on:
+      - influxdb
+
+  update-service:
+    build:
+      context: ..
+      dockerfile: docker/update-service/Dockerfile
+    image: ghcr.io/sv-afterglow/data-hub/update-service:latest
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc:/etc:ro
+      - ~/.data-hub:/data
+    environment:
+      - GITHUB_REPO=sv-afterglow/data-hub
+      - GITHUB_BRANCH=main
+      - UPDATE_CHECK_INTERVAL=3600
+      - INFLUX_URL=http://influxdb:8086
 
   watchtower:
     image: containrrr/watchtower

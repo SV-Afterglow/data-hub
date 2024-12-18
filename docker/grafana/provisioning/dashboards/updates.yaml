@@ -1,0 +1,15 @@
+apiVersion: 1
+
+providers:
+  - name: 'System Updates'
+    orgId: 1
+    folder: 'System'
+    folderUid: system
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: true

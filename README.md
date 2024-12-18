@@ -9,6 +9,7 @@ The Data Hub serves as a central nervous system for vessel data, providing:
 - Real-time data processing through SignalK
 - Time-series data storage in InfluxDB
 - Data visualization via Grafana dashboards
+- System performance monitoring
 - Automated updates and maintenance
 
 ## Quick Start
@@ -36,10 +37,13 @@ For detailed manual installation steps and troubleshooting, see the [Installatio
 ```
 data-hub/
 ├── docker/              # Container configurations
-│   ├── docker-compose.yml
-│   ├── signalk/
-│   ├── influxdb/
-│   └── grafana/
+│   ├── compose/        # Docker compose files
+│   ├── signalk/       # SignalK server configuration
+│   ├── influxdb/      # InfluxDB configuration
+│   ├── grafana/       # Grafana configuration
+│   └── system-metrics/ # System metrics collector
+├── services/           # Application services
+│   └── system-metrics/ # System metrics collector service
 ├── config/             # Application configs
 │   ├── signalk/
 │   ├── influxdb/
@@ -53,7 +57,24 @@ data-hub/
 1. NMEA2000 data is received through the PICAN-M HAT
 2. SignalK processes and normalizes the data
 3. Data is stored in InfluxDB for historical analysis
-4. Grafana visualizes both real-time and historical data
+4. System metrics are collected and stored in InfluxDB
+5. Grafana visualizes both real-time and historical data
+
+## Features
+
+### Marine Data
+- NMEA2000 network integration
+- Real-time data processing via SignalK
+- Historical data storage in InfluxDB
+- Customizable Grafana dashboards
+
+### System Monitoring
+- CPU usage and temperature
+- Memory utilization
+- Disk space monitoring
+- System load averages
+- Real-time performance graphs
+- Historical trend analysis
 
 ## Development
 
@@ -81,3 +102,4 @@ This is a private repository. For support:
 - [SignalK Documentation](https://signalk.org/)
 - [CopperHill PICAN-M Documentation](https://copperhilltech.com/pican-m-nmea-0183-nmea-2000-hat-for-raspberry-pi/)
 - [InfluxDB Documentation](https://docs.influxdata.com/influxdb/v1.8/)
+- [Grafana Documentation](https://grafana.com/docs/)

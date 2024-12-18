@@ -256,7 +256,13 @@ print_step "Setting up service directories..."
 if ! log_cmd_output "mkdir -p ~/influxdb-data ~/.signalk ~/grafana-data"; then
     handle_error "Failed to create data directories" "$(tail -n 20 "$LOG_FILE")"
 fi
-print_success "Data directories created"
+
+# Set correct permissions for data directories
+print_step "Setting correct permissions for data directories..."
+if ! log_cmd_output "sudo chown -R 999:999 ~/influxdb-data && sudo chown -R 472:472 ~/grafana-data"; then
+    handle_error "Failed to set directory permissions" "$(tail -n 20 "$LOG_FILE")"
+fi
+print_success "Data directories created and permissions set"
 
 # InfluxDB Configuration
 print_header "InfluxDB Configuration"
@@ -304,6 +310,7 @@ services:
     environment:
       - INFLUXDB_DB=signalk
       - INFLUXDB_HTTP_AUTH_ENABLED=false
+    user: "999:999"
 
   grafana:
     image: grafana/grafana:latest
@@ -314,6 +321,24 @@ services:
       - ~/grafana-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_PATHS_DATA=/var/lib/grafana
+      - GF_USERS_ALLOW_SIGN_UP=false
+    user: "472:472"
+    depends_on:
+      - influxdb
+
+  system-metrics:
+    build:
+      context: .
+      dockerfile: docker/system-metrics/Dockerfile
+    image: ghcr.io/sv-afterglow/data-hub/system-metrics:latest
+    restart: always
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /sys/class/thermal:/sys/class/thermal:ro
+    environment:
+      - INFLUX_URL=http://influxdb:8086
+      - COLLECTION_INTERVAL=10
     depends_on:
       - influxdb
 
@@ -400,6 +425,10 @@ echo -e "   ${MAGENTA}- Configure with:${NC}"
 echo -e "     ${BOLD}Host: influxdb${NC}"
 echo -e "     ${BOLD}Port: 8086${NC}"
 echo -e "     ${BOLD}Database: signalk${NC}"
+echo -e "${CYAN}3. View System Metrics:${NC}"
+echo -e "   ${MAGENTA}- Visit ${BOLD}http://data-hub.local:3001${NC}"
+echo -e "   ${MAGENTA}- Navigate to the System Metrics dashboard${NC}"
+echo -e "   ${MAGENTA}- Monitor CPU, Memory, and System Load${NC}"
 echo ""
 print_warning "Please reboot your system to complete the setup."
 echo ""
