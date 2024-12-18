@@ -48,12 +48,12 @@ curl -s "$BASE_URL/services/update-service/updater.py" > ~/.data-hub/update-serv
 curl -s "$BASE_URL/version.yml" > ~/.data-hub/version.yml
 
 # Create update service compose file
-cat > ~/.data-hub/update-service/docker-compose.yaml << EOF
+cat > ~/.data-hub/update-service/docker-compose.yaml << 'EOF'
 version: '2'
+
 services:
   update-service:
     build: .
-    image: ghcr.io/sv-afterglow/data-hub/update-service:latest
     container_name: data-hub_update-service_1
     restart: always
     volumes:
@@ -66,15 +66,16 @@ services:
       - UPDATE_CHECK_INTERVAL=3600
       - INFLUX_URL=http://influxdb:8086
     networks:
-      - data-hub_default
+      - data-hub
 
 networks:
-  data-hub_default:
-    external: true
+  data-hub:
+    external:
+      name: data-hub_default
 EOF
 
 # Create Dockerfile for update service
-cat > ~/.data-hub/update-service/Dockerfile << EOF
+cat > ~/.data-hub/update-service/Dockerfile << 'EOF'
 FROM python:3.11-slim
 
 # Install system dependencies
