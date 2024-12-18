@@ -17,7 +17,7 @@ GITHUB_BRANCH = os.getenv('GITHUB_BRANCH', 'main')
 CHECK_INTERVAL = int(os.getenv('UPDATE_CHECK_INTERVAL', '3600'))  # Default 1 hour
 DATA_DIR = Path(os.getenv('DATA_DIR', '/data'))
 HOME_DIR = Path(os.path.expanduser('~'))
-COMPOSE_FILE = HOME_DIR / 'docker-compose.yml'  # Where we write the compose file
+COMPOSE_FILE = HOME_DIR / 'data-hub/docker-compose.yml'  # Updated path
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
 INFLUX_DB = "system_updates"
 
@@ -49,6 +49,7 @@ class UpdateService:
         """Ensure required directories exist."""
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
+        COMPOSE_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     def setup_influxdb(self):
         """Setup InfluxDB database for update metrics."""
@@ -206,7 +207,7 @@ class UpdateService:
                 pass
 
             # Restart services using docker-compose command
-            os.system('docker-compose up -d')
+            os.system(f'cd {COMPOSE_FILE.parent} && docker-compose up -d')
             
             duration = time.time() - start_time
             self.log_metric("rollback",
@@ -300,7 +301,7 @@ class UpdateService:
                 yaml.dump({'version': version}, f)
 
             # Restart services using docker-compose command
-            os.system('docker-compose up -d')
+            os.system(f'cd {COMPOSE_FILE.parent} && docker-compose up -d')
 
             # Verify update
             if not self.verify_update(version):
