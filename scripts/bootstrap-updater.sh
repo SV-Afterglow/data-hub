@@ -43,11 +43,11 @@ if [ ! -f ~/data-hub/docker-compose.yml ]; then
     curl -s "https://raw.githubusercontent.com/sv-afterglow/data-hub/main/docker/compose/docker-compose.yaml" > ~/data-hub/docker-compose.yml
 fi
 
-# Start or restart the services using the main docker-compose.yml
+# Start or restart the services using docker-compose
 echo "Starting services..."
 cd ~/data-hub
-docker compose pull
-docker compose up -d
+docker-compose pull
+docker-compose up -d
 
 echo -e "${GREEN}Update service successfully installed!${NC}"
 echo "The update service will now:"
@@ -56,7 +56,7 @@ echo "2. Download and apply updates automatically"
 echo "3. Handle rollbacks if updates fail"
 echo ""
 echo -e "${YELLOW}To check the update service logs:${NC}"
-echo "docker compose -f ~/data-hub/docker-compose.yml logs -f update-service"
+echo "docker-compose -f ~/data-hub/docker-compose.yml logs -f update-service"
 echo ""
 echo -e "${YELLOW}To restart all services:${NC}"
-echo "docker compose -f ~/data-hub/docker-compose.yml restart"
+echo "docker-compose -f ~/data-hub/docker-compose.yml restart"
