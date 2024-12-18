@@ -1,0 +1,15 @@
+# Local development and planning
+next_steps.md
+
+# Runtime data
+*.log
+*.pid
+
+# Local environment
+.env
+.env.*
+
+# Build artifacts
+/build/
+__pycache__/
+*.pyc
