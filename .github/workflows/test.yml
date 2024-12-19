@@ -34,7 +34,7 @@ jobs:
         
     - name: Run unit tests
       run: |
-        pytest tests/unit/ --cov=services --cov-report=xml
+        PYTHONPATH=$PYTHONPATH:$(pwd) pytest tests/unit/ --cov=services --cov-report=xml
         
     - name: Upload coverage
       uses: codecov/codecov-action@v3
@@ -81,7 +81,7 @@ jobs:
         
     - name: Run integration tests
       run: |
-        pytest tests/integration/
+        PYTHONPATH=$PYTHONPATH:$(pwd) pytest tests/integration/
         
   validation:
     name: Configuration Validation
@@ -101,7 +101,7 @@ jobs:
         
     - name: Validate configurations
       run: |
-        pytest tests/validation/
+        PYTHONPATH=$PYTHONPATH:$(pwd) pytest tests/validation/
         
     - name: Validate Dockerfiles
       run: |
@@ -136,7 +136,7 @@ jobs:
         docker-compose -f docker/compose/docker-compose.yaml up -d influxdb
         
         # Run update service tests
-        pytest tests/integration/test_service_interactions.py -k "test_update_service"
+        PYTHONPATH=$PYTHONPATH:$(pwd) pytest tests/integration/test_service_interactions.py -k "test_update_service"
 
   docker-builds:
     name: Docker Build Tests
