@@ -99,6 +99,12 @@ jobs:
       run: |
         pip install pytest pyyaml jsonschema docker
         
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Create Docker network
+      run: docker network create data-hub || true
+        
     - name: Validate configurations
       run: |
         PYTHONPATH=$PYTHONPATH:$(pwd) pytest tests/validation/

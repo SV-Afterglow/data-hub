@@ -10,7 +10,7 @@ class TestNetworkMonitorConfig:
 
     def test_dockerfile_structure(self):
         """Validate Dockerfile follows best practices."""
-        dockerfile_path = Path(__file__).parent.parent.parent / "docker/network-monitor/Dockerfile"
+        dockerfile_path = Path(__file__).parent.parent.parent / "docker/network_monitor/Dockerfile"
         assert dockerfile_path.exists(), "Dockerfile not found"
         
         with open(dockerfile_path) as f:
@@ -39,8 +39,8 @@ class TestNetworkMonitorConfig:
             config = yaml.safe_load(f)
             
             # Check service exists
-            assert "network-monitor" in config["services"], "Service not defined"
-            service = config["services"]["network-monitor"]
+            assert "network_monitor" in config["services"], "Service not defined"
+            service = config["services"]["network_monitor"]
             
             # Check required configuration
             assert service.get("network_mode") == "host", "Requires host network"
@@ -78,7 +78,7 @@ class TestNetworkMonitorConfig:
 
     def test_python_requirements(self):
         """Validate Python package requirements."""
-        req_path = Path(__file__).parent.parent.parent / "services/network-monitor/requirements.txt"
+        req_path = Path(__file__).parent.parent.parent / "services/network_monitor/requirements.txt"
         assert req_path.exists(), "requirements.txt not found"
         
         with open(req_path) as f:
@@ -97,7 +97,7 @@ class TestNetworkMonitorConfig:
 
     def test_service_permissions(self):
         """Validate file permissions."""
-        service_dir = Path(__file__).parent.parent.parent / "services/network-monitor"
+        service_dir = Path(__file__).parent.parent.parent / "services/network_monitor"
         
         # Check executable permissions
         monitor_script = service_dir / "network_monitor.py"
