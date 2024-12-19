@@ -25,6 +25,8 @@ jobs:
         pip install pytest pytest-cov
         pip install -r services/update-service/requirements.txt
         pip install -r services/system-metrics/requirements.txt
+        pip install -r services/network-monitor/requirements.txt
+        sudo apt-get update && sudo apt-get install -y wireless-tools
         
     - name: Run unit tests
       run: |
@@ -61,6 +63,8 @@ jobs:
         # Create test configuration
         mkdir -p config/test
         echo "test: value" > config/test/test_config.yml
+        # Create mock network interface for testing
+        sudo ip link add test0 type dummy || true
         
     - name: Build services
       run: |
@@ -146,7 +150,7 @@ jobs:
     - name: Verify service health
       run: |
         # Check each service's health status
-        for service in influxdb grafana system-metrics update-service; do
+        for service in influxdb grafana system-metrics update-service network-monitor; do
           docker inspect --format='{{.State.Health.Status}}' data-hub_${service}_1
         done
 
