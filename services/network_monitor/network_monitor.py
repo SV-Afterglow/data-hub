@@ -8,8 +8,7 @@ import schedule
 import subprocess
 import speedtest
 from datetime import datetime
-from influxdb_client import InfluxDBClient, Point
-from influxdb_client.client.write_api import SYNCHRONOUS
+from influxdb import InfluxDBClient
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Configuration from environment variables
@@ -24,13 +23,12 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger('network-monitor')
+logger = logging.getLogger('network_monitor')
 
 class NetworkMonitor:
     def __init__(self):
         """Initialize the network monitor."""
-        self.influx_client = InfluxDBClient(url=INFLUX_URL)
-        self.write_api = self.influx_client.write_api(write_options=SYNCHRONOUS)
+        self.influx_client = InfluxDBClient(host='influxdb', port=8086)
         self.speedtest_client = speedtest.Speedtest()
         self.last_wifi_status = None
         self.last_speed_test = 0
@@ -39,10 +37,11 @@ class NetworkMonitor:
     def setup_influxdb(self):
         """Ensure InfluxDB is properly configured."""
         try:
-            bucket_api = self.influx_client.buckets_api()
-            if "network_metrics" not in [b.name for b in bucket_api.find_buckets()]:
-                bucket_api.create_bucket(bucket_name="network_metrics")
-                logger.info("Created InfluxDB bucket: network_metrics")
+            databases = self.influx_client.get_list_database()
+            if "network_metrics" not in [db['name'] for db in databases]:
+                self.influx_client.create_database("network_metrics")
+                logger.info("Created InfluxDB database: network_metrics")
+            self.influx_client.switch_database("network_metrics")
         except Exception as e:
             logger.error(f"Error setting up InfluxDB: {e}")
             raise
@@ -117,36 +116,48 @@ class NetworkMonitor:
         """Log WiFi status to InfluxDB."""
         try:
             # Create status point with required fields
-            point = Point("wifi_status") \
-                .tag("interface", NETWORK_INTERFACE) \
-                .tag("connection_type", "wifi") \
-                .field("connected", status['connected'])
+            point = {
+                "measurement": "wifi_status",
+                "tags": {
+                    "interface": NETWORK_INTERFACE,
+                    "connection_type": "wifi"
+                },
+                "fields": {
+                    "connected": status['connected']
+                }
+            }
 
             # Add optional fields if present
             if status['connected']:
                 if status.get('ssid'):
-                    point = point.field("ssid", status['ssid'])
+                    point['fields']["ssid"] = status['ssid']
                 if status.get('frequency'):
-                    point = point.field("frequency", status['frequency'])
+                    point['fields']["frequency"] = status['frequency']
                 if status.get('rssi'):
-                    point = point.field("rssi", status['rssi'])
+                    point['fields']["rssi"] = status['rssi']
                 if status.get('quality'):
-                    point = point.field("quality", status['quality'])
+                    point['fields']["quality"] = status['quality']
 
-            self.write_api.write(bucket="network_metrics", record=point)
+            self.influx_client.write_points([point])
             
             # Log connection state changes
             if self.last_wifi_status is None:
                 self.last_wifi_status = status.copy()
             elif self.last_wifi_status['connected'] != status['connected'] or \
                  (status['connected'] and self.last_wifi_status.get('ssid') != status.get('ssid')):
-                event = Point("network_events") \
-                    .tag("interface", NETWORK_INTERFACE) \
-                    .tag("event_category", "connection") \
-                    .field("event_type", "connect" if status['connected'] else "disconnect") \
-                    .field("previous_ssid", self.last_wifi_status.get('ssid')) \
-                    .field("new_ssid", status.get('ssid'))
-                self.write_api.write(bucket="network_metrics", record=event)
+                event = {
+                    "measurement": "network_events",
+                    "tags": {
+                        "interface": NETWORK_INTERFACE,
+                        "event_category": "connection"
+                    },
+                    "fields": {
+                        "event_type": "connect" if status['connected'] else "disconnect",
+                        "previous_ssid": self.last_wifi_status.get('ssid'),
+                        "new_ssid": status.get('ssid')
+                    }
+                }
+                self.influx_client.write_points([event])
                 self.last_wifi_status = status.copy()
 
         except Exception as e:
@@ -173,14 +184,20 @@ class NetworkMonitor:
             ping = self.speedtest_client.results.ping
             
             # Log results
-            point = Point("network_speed") \
-                .tag("interface", NETWORK_INTERFACE) \
-                .tag("test_server", self.speedtest_client.results.server['host']) \
-                .field("download_mbps", download_speed) \
-                .field("upload_mbps", upload_speed) \
-                .field("latency_ms", ping)
+            point = {
+                "measurement": "network_speed",
+                "tags": {
+                    "interface": NETWORK_INTERFACE,
+                    "test_server": self.speedtest_client.results.server['host']
+                },
+                "fields": {
+                    "download_mbps": download_speed,
+                    "upload_mbps": upload_speed,
+                    "latency_ms": ping
+                }
+            }
 
-            self.write_api.write(bucket="network_metrics", record=point)
+            self.influx_client.write_points([point])
             
             self.last_speed_test = now
             logger.info(f"Speed test complete - Down: {download_speed:.1f} Mbps, Up: {upload_speed:.1f} Mbps, Ping: {ping:.0f}ms")

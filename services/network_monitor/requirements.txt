@@ -5,7 +5,7 @@ iwlib>=1.7.0           # Alternative WiFi monitoring library
 psutil>=5.9.0          # System and network interface info
 
 # Data handling
-influxdb-client>=1.36.0  # InfluxDB metrics storage
+influxdb==5.3.1         # InfluxDB metrics storage
 pyyaml>=6.0.1           # Configuration file handling
 python-dateutil>=2.8.2   # Time handling utilities
 

@@ -9,7 +9,7 @@ import logging
 import subprocess
 from pathlib import Path
 from datetime import datetime
-from packaging import version
+from packaging.version import parse as parse_version
 from influxdb import InfluxDBClient
 
 # Configuration from environment variables
@@ -34,7 +34,7 @@ logger = logging.getLogger('update-service')
 def compare_versions(v1, v2):
     """Compare two version strings."""
     try:
-        return version.parse(v1) > version.parse(v2)
+        return parse_version(v1) > parse_version(v2)
     except Exception as e:
         logger.error(f"Version comparison error: {e}")
         return False
@@ -387,6 +387,10 @@ class UpdateService:
         logger.info(f"Starting update to version {version}")
         start_time = time.time()
         
+        # Initialize step tracking
+        completed_steps = 0
+        total_steps = 0
+        
         # Create backup
         backup_path = self.backup_system()
         if not backup_path:
@@ -406,7 +410,7 @@ class UpdateService:
             if 'requires' in manifest:
                 current = self.get_current_version()
                 required = manifest['requires']
-                if version.parse(current) < version.parse(required):
+                if parse_version(current) < parse_version(required):
                     raise Exception(f"Current version {current} does not meet required version {required}")
                 logger.debug(f"Version requirement satisfied: {current} >= {required}")
 
@@ -434,7 +438,11 @@ class UpdateService:
                         logger.debug(f"Downloading config from {config_url}")
                         response = requests.get(config_url)
                         response.raise_for_status()
-                        target_path = REPO_ROOT / step['target'].lstrip('/data/data-hub/')  # Update target path to use repo root
+                        # Handle both absolute and relative paths
+                        target = step['target']
+                        if target.startswith('/data/data-hub/'):
+                            target = target.lstrip('/data/data-hub/')
+                        target_path = REPO_ROOT / target
                         os.makedirs(os.path.dirname(target_path), exist_ok=True)
                         with open(target_path, 'w') as f:
                             f.write(response.text)
@@ -442,7 +450,7 @@ class UpdateService:
                         # Set file permissions if specified
                         if 'permissions' in step:
                             mode = int(step['permissions'], 8)  # Convert octal string to int
-                            os.chmod(target_path, mode)
+                            os.chmod(str(target_path), mode)  # Convert Path to string for chmod
                             logger.debug(f"Set permissions {step['permissions']} on {target_path}")
                     elif step_type == 'system_package':
                         # Skip system package installation

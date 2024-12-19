@@ -6,8 +6,6 @@ import time
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
-from influxdb_client import Point
-
 # Mock the iwlib module since it requires system dependencies
 sys.modules['iwlib'] = MagicMock()
 sys.modules['python_wifi'] = MagicMock()
@@ -19,18 +17,10 @@ def network_monitor():
     """Create a NetworkMonitor instance with mocked clients."""
     with patch('services.network_monitor.network_monitor.InfluxDBClient') as mock_influx, \
          patch('speedtest.Speedtest') as mock_speedtest:
-        # Mock the bucket API
-        mock_bucket = Mock()
-        mock_bucket.name = "network_metrics"
-        mock_bucket_api = Mock()
-        mock_bucket_api.find_buckets.return_value = [mock_bucket]
-        mock_influx.buckets_api.return_value = mock_bucket_api
-
-        # Mock write API
-        mock_write_api = Mock()
-        mock_influx.write_api.return_value = mock_write_api
-
-        # Mock ping method
+        # Mock database methods
+        mock_influx.get_list_database.return_value = [{'name': 'network_metrics'}]
+        mock_influx.switch_database.return_value = True
+        mock_influx.write_points.return_value = True
         mock_influx.ping.return_value = True
 
         # Create monitor with mocked clients
@@ -116,15 +106,15 @@ class TestSpeedTest:
         network_monitor.run_speed_test()
         
         # Verify metrics were logged
-        write_api = network_monitor.influx_client.write_api.return_value
-        assert write_api.write.called
+        assert network_monitor.influx_client.write_points.called
         
         # Verify correct values
-        point = write_api.write.call_args[1]['record']
-        assert isinstance(point, Point)
-        assert point._fields['download_mbps'] == 50.0
-        assert point._fields['upload_mbps'] == 20.0
-        assert point._fields['latency_ms'] == 20
+        points = network_monitor.influx_client.write_points.call_args[0][0]
+        point = points[0]
+        assert point['measurement'] == 'network_speed'
+        assert point['fields']['download_mbps'] == 50.0
+        assert point['fields']['upload_mbps'] == 20.0
+        assert point['fields']['latency_ms'] == 20
 
     def test_speed_test_throttling(self, network_monitor):
         """Test speed test throttling."""
@@ -153,13 +143,14 @@ class TestMetricsLogging:
         
         network_monitor.log_wifi_status(status)
         
-        write_api = network_monitor.influx_client.write_api.return_value
-        point = write_api.write.call_args[1]['record']
+        points = network_monitor.influx_client.write_points.call_args[0][0]
+        point = points[0]
         
-        assert point._fields['connected'] == True
-        assert point._fields['ssid'] == 'Test Network'
-        assert point._fields['rssi'] == -65
-        assert point._fields['quality'] == 80
+        assert point['measurement'] == 'wifi_status'
+        assert point['fields']['connected'] == True
+        assert point['fields']['ssid'] == 'Test Network'
+        assert point['fields']['rssi'] == -65
+        assert point['fields']['quality'] == 80
 
     def test_connection_event_logging(self, network_monitor):
         """Test logging of connection state changes."""
@@ -179,17 +170,17 @@ class TestMetricsLogging:
         network_monitor.log_wifi_status(new_status)
         
         # Verify event was logged
-        write_api = network_monitor.influx_client.write_api.return_value
-        calls = write_api.write.call_args_list
+        calls = network_monitor.influx_client.write_points.call_args_list
         
         # Should have two writes: status and event
         assert len(calls) == 2
         
         # Verify event fields
-        event_point = calls[1][1]['record']
-        assert event_point._fields['event_type'] == 'connect'
-        assert event_point._fields['previous_ssid'] == 'Old Network'
-        assert event_point._fields['new_ssid'] == 'New Network'
+        event_point = calls[1][0][0][0]
+        assert event_point['measurement'] == 'network_events'
+        assert event_point['fields']['event_type'] == 'connect'
+        assert event_point['fields']['previous_ssid'] == 'Old Network'
+        assert event_point['fields']['new_ssid'] == 'New Network'
 
 class TestHealthCheck:
     """Test service health checking."""
