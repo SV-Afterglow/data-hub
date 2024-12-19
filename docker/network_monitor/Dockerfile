@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y \
     libiw-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY services/network_monitor/requirements.txt .
+# Copy requirements first for better caching
+COPY ./services/network_monitor/requirements.txt .
 
 # Install dependencies
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
@@ -38,7 +38,7 @@ COPY --from=builder /app/requirements.txt .
 RUN pip install --no-cache /wheels/*
 
 # Copy application code
-COPY services/network_monitor/network_monitor.py .
+COPY ./services/network_monitor/network_monitor.py .
 
 # Set permissions
 RUN chown -R monitor:monitor /app && \
