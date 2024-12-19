@@ -7,6 +7,8 @@ services:
       dockerfile: docker/signalk/Dockerfile
     image: ghcr.io/sv-afterglow/data-hub/signalk:latest
     restart: always
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"  # Managed by update-service
     network_mode: host  # Required for NMEA2000
     volumes:
       - ~/.signalk:/home/node/.signalk
@@ -20,6 +22,8 @@ services:
       dockerfile: docker/influxdb/Dockerfile
     image: ghcr.io/sv-afterglow/data-hub/influxdb:latest
     restart: always
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"  # Managed by update-service
     ports:
       - "8086:8086"
     volumes:
@@ -36,6 +40,8 @@ services:
       dockerfile: docker/grafana/Dockerfile
     image: ghcr.io/sv-afterglow/data-hub/grafana:latest
     restart: always
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"  # Managed by update-service
     ports:
       - "3001:3000"
     volumes:
@@ -52,6 +58,8 @@ services:
       context: ../..
       dockerfile: docker/system-metrics/Dockerfile
     restart: always
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"  # Managed by update-service
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /sys/class/thermal:/sys/class/thermal:ro
@@ -69,6 +77,8 @@ services:
       context: ../..
       dockerfile: docker/update-service/Dockerfile
     restart: always
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"  # Managed by update-service
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc:/etc:ro
@@ -91,9 +101,44 @@ services:
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --cleanup --interval 30
+    command: --cleanup --interval 3600 --label-enable
     networks:
       - data-hub
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  network-monitor:
+    build:
+      context: ../..  # Go up two levels from docker/compose
+      dockerfile: docker/network-monitor/Dockerfile
+    image: ghcr.io/sv-afterglow/data-hub/network-monitor:latest
+    restart: always
+    network_mode: host  # Required for network interface access
+    privileged: true    # Required for WiFi monitoring
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"  # Managed by update-service
+    volumes:
+      - /etc/localtime:/etc/localtime:ro  # System time sync
+      - /proc/net/dev:/proc/net/dev:ro    # Network interface stats
+      - /sys/class/net:/sys/class/net:ro  # Network interface info
+      - ~/.data-hub:/data                 # Persistent data
+    environment:
+      - NETWORK_INTERFACE=wlan0
+      - SPEED_TEST_INTERVAL=3600
+      - WIFI_CHECK_INTERVAL=30
+      - INFLUX_URL=http://influxdb:8086
+      - MIN_SPEED_TEST_INTERVAL=600
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      - influxdb  # Requires InfluxDB for metrics storage
+    cap_add:
+      - NET_ADMIN  # Required for network interface access
+      - NET_RAW    # Required for raw socket access
 
 networks:
   data-hub:

@@ -1,0 +1,22 @@
+# Network monitoring
+speedtest-cli>=2.1.3    # Internet speed testing
+python-wifi>=0.6.1      # WiFi interface monitoring
+iwlib>=1.7.0           # Alternative WiFi monitoring library
+psutil>=5.9.0          # System and network interface info
+
+# Data handling
+influxdb-client>=1.36.0  # InfluxDB metrics storage
+pyyaml>=6.0.1           # Configuration file handling
+python-dateutil>=2.8.2   # Time handling utilities
+
+# Operational
+requests>=2.31.0        # HTTP client for API calls
+tenacity>=8.2.2        # Retry handling
+schedule>=1.2.0        # Task scheduling
+
+# Development
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.1
+responses>=0.23.1      # HTTP mocking
+freezegun>=1.2.2       # Time mocking

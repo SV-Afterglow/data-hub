@@ -41,10 +41,13 @@ data-hub/
 │   ├── signalk/       # SignalK server configuration
 │   ├── influxdb/      # InfluxDB configuration
 │   ├── grafana/       # Grafana configuration
-│   └── system-metrics/ # System metrics collector
+│   ├── system-metrics/ # System metrics collector
+│   └── update-service/ # Automated update service
 ├── services/           # Application services
-│   └── system-metrics/ # System metrics collector service
-├── config/             # Application configs
+│   ├── system-metrics/ # System metrics collector service
+│   └── update-service/ # Update management service
+├── updates/           # Version updates and manifests
+├── config/            # Application configs
 │   ├── signalk/
 │   ├── influxdb/
 │   └── grafana/
@@ -59,6 +62,13 @@ data-hub/
 3. Data is stored in InfluxDB for historical analysis
 4. System metrics are collected and stored in InfluxDB
 5. Grafana visualizes both real-time and historical data
+
+### Update Flow
+1. Update service checks for new versions periodically
+2. New versions are detected via version.yml and manifest files
+3. Updates are automatically downloaded and applied
+4. Services are restarted as needed
+5. Update status is logged to InfluxDB
 
 ## Features
 
@@ -76,6 +86,13 @@ data-hub/
 - Real-time performance graphs
 - Historical trend analysis
 
+### Automated Updates
+- Version-controlled updates
+- Automatic detection of new versions
+- Safe update application
+- Rollback capability
+- Update status monitoring
+
 ## Development
 
 1. Local Development
@@ -86,8 +103,15 @@ data-hub/
 
 2. Deployment
    - Merge to main branch
-   - Automatic container updates via Watchtower
+   - Automatic container updates via update service and Watchtower
    - Monitor logs for success
+
+### Adding New Services
+1. Create service directory in services/
+2. Add Dockerfile in docker/service-name/
+3. Update docker-compose.yaml
+4. Add service to update manifests
+5. Document in appropriate README
 
 ## Support
 
