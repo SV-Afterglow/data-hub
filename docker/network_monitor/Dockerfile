@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements
-COPY services/network-monitor/requirements.txt .
+COPY services/network_monitor/requirements.txt .
 
 # Install dependencies
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
@@ -34,7 +34,7 @@ WORKDIR /app
 COPY --from=builder /app/wheels /wheels
 
 # Copy application
-COPY services/network-monitor/ .
+COPY services/network_monitor/ .
 
 # Install dependencies
 RUN pip install --no-cache /wheels/*

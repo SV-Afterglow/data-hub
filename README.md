@@ -41,11 +41,11 @@ data-hub/
 │   ├── signalk/       # SignalK server configuration
 │   ├── influxdb/      # InfluxDB configuration
 │   ├── grafana/       # Grafana configuration
-│   ├── system-metrics/ # System metrics collector
-│   └── update-service/ # Automated update service
+│   ├── system_metrics/ # System metrics collector
+│   └── update_service/ # Automated update service
 ├── services/           # Application services
-│   ├── system-metrics/ # System metrics collector service
-│   └── update-service/ # Update management service
+│   ├── system_metrics/ # System metrics collector service
+│   └── update_service/ # Update management service
 ├── updates/           # Version updates and manifests
 ├── config/            # Application configs
 │   ├── signalk/

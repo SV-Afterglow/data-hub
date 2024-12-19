@@ -10,24 +10,24 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Create data directory structure
-RUN mkdir -p /data/services/system-metrics
+RUN mkdir -p /data/services/system_metrics
 
 # Copy requirements first for better caching
-COPY services/system-metrics/requirements.txt .
+COPY services/system_metrics/requirements.txt .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Note: collector.py will be mounted from ~/.data-hub/services/system-metrics/
 # Copy a default version for initial build
-COPY services/system-metrics/collector.py ./collector.py.default
+COPY services/system_metrics/collector.py ./collector.py.default
 
 # Make script executable
 RUN chmod +x collector.py.default
 
 # Use the mounted collector.py if it exists, otherwise use default
 CMD ["sh", "-c", "\
-    if [ -f /data/services/system-metrics/collector.py ]; then \
+    if [ -f /data/services/system_metrics/collector.py ]; then \
         echo 'Found mounted collector.py, using it...'; \
         cp /data/services/system-metrics/collector.py ./collector.py; \
         chmod +x ./collector.py; \

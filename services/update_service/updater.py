@@ -24,7 +24,6 @@ INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
 INFLUX_DB = "system_updates"
 NETWORK_NAME = 'data-hub_data-hub'
 
-[Previous code unchanged until build section in restart_services]
 # Setup logging with more detail
 logging.basicConfig(
     level=logging.DEBUG,  # Changed to DEBUG for more detail
@@ -216,7 +215,7 @@ class UpdateService:
 
             # If no services specified, restart all except ourselves and watchtower
             if services_to_restart is None:
-                services_to_restart = set(available_services) - {'update-service', 'watchtower'}
+                services_to_restart = set(available_services) - {'update_service', 'watchtower'}
             else:
                 # Validate specified services exist
                 invalid_services = services_to_restart - set(available_services)

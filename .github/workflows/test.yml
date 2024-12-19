@@ -28,9 +28,9 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pytest pytest-cov
-        pip install -r services/update-service/requirements.txt
-        pip install -r services/system-metrics/requirements.txt
-        pip install -r services/network-monitor/requirements.txt
+        pip install -r services/update_service/requirements.txt
+        pip install -r services/system_metrics/requirements.txt
+        pip install -r services/network_monitor/requirements.txt
         
     - name: Run unit tests
       run: |
@@ -164,7 +164,7 @@ jobs:
     - name: Verify service health
       run: |
         # Check each service's health status
-        for service in influxdb grafana system-metrics update-service network-monitor; do
+        for service in influxdb grafana system_metrics update_service network_monitor; do
           docker inspect --format='{{.State.Health.Status}}' data-hub_${service}_1
         done
 

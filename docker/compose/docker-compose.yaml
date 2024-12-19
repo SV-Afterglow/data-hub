@@ -53,10 +53,10 @@ services:
     networks:
       - data-hub
 
-  system-metrics:
+  system_metrics:
     build:
       context: ../..
-      dockerfile: docker/system-metrics/Dockerfile
+      dockerfile: docker/system_metrics/Dockerfile
     restart: always
     labels:
       - "com.centurylinklabs.watchtower.enable=false"  # Managed by update-service
@@ -72,10 +72,10 @@ services:
     networks:
       - data-hub
 
-  update-service:
+  update_service:
     build:
       context: ../..
-      dockerfile: docker/update-service/Dockerfile
+      dockerfile: docker/update_service/Dockerfile
     restart: always
     labels:
       - "com.centurylinklabs.watchtower.enable=false"  # Managed by update-service
@@ -107,11 +107,11 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
-  network-monitor:
+  network_monitor:
     build:
       context: ../..  # Go up two levels from docker/compose
-      dockerfile: docker/network-monitor/Dockerfile
-    image: ghcr.io/sv-afterglow/data-hub/network-monitor:latest
+      dockerfile: docker/network_monitor/Dockerfile
+    image: ghcr.io/sv-afterglow/data-hub/network_monitor:latest
     restart: always
     network_mode: host  # Required for network interface access
     privileged: true    # Required for WiFi monitoring
