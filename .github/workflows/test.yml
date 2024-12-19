@@ -19,14 +19,18 @@ jobs:
       with:
         python-version: '3.11'
         
-    - name: Install dependencies
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wireless-tools libiw-dev
+
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install pytest pytest-cov
         pip install -r services/update-service/requirements.txt
         pip install -r services/system-metrics/requirements.txt
         pip install -r services/network-monitor/requirements.txt
-        sudo apt-get update && sudo apt-get install -y wireless-tools
         
     - name: Run unit tests
       run: |
@@ -56,6 +60,11 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wireless-tools libiw-dev
+
     - name: Set up test environment
       run: |
         # Create test data directory
@@ -88,7 +97,7 @@ jobs:
         
     - name: Install validation dependencies
       run: |
-        pip install pyyaml jsonschema docker
+        pip install pytest pyyaml jsonschema docker
         
     - name: Validate configurations
       run: |
@@ -136,6 +145,11 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wireless-tools libiw-dev
+
     - name: Build all services
       run: |
         docker-compose -f docker/compose/docker-compose.yaml build
