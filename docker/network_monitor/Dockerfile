@@ -7,6 +7,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     python3-dev \
+    libiw-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
@@ -23,6 +24,7 @@ WORKDIR /app
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     wireless-tools \
+    libiw-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
