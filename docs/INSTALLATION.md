@@ -53,7 +53,34 @@ The setup script will automatically:
 - Configure the PICAN-M HAT and CAN interface
 - Create necessary data directories with correct permissions
 
-### 4. Post-Installation Configuration
+### 4. Directory Structure Setup
+
+The system requires several persistent data directories:
+
+1. **SignalK Data**: `~/.signalk/`
+   - Stores SignalK configuration and plugins
+   - Created automatically by setup script
+   - Mounted to SignalK container
+
+2. **Grafana Data**: `~/grafana-data/`
+   - Stores dashboards and configurations
+   - Must be owned by uid:gid 472:472
+   - Created by setup script with correct permissions
+
+3. **InfluxDB Data**: `~/influxdb-data/`
+   - Stores time-series data
+   - Created automatically by setup script
+
+4. **Data Hub Data**: `~/.data-hub/`
+   - Stores system metrics and update service data
+   - Created by setup script
+   - Used by system-metrics and update-service containers
+   - Contains:
+     - Collector configuration
+     - Update manifests
+     - Service status data
+
+### 5. Post-Installation Configuration
 
 #### SignalK Plugin Management
 SignalK plugins are managed through two mechanisms:
@@ -87,6 +114,26 @@ Add InfluxDB as data source:
 - Database: signalk
 - No authentication required
 
+### 6. Update Service Configuration
+
+The update service automatically manages system updates:
+
+1. **Version Checking**
+   - Checks GitHub repository for updates every hour
+   - Compares local version.yml with remote
+   - Logs status to InfluxDB
+
+2. **Update Application**
+   - Downloads new versions automatically
+   - Applies updates based on manifest files
+   - Restarts affected services
+   - Maintains update history
+
+3. **Monitoring**
+   - Update status visible in Grafana
+   - Logs available in update service container
+   - Version history tracked in InfluxDB
+
 ## Troubleshooting
 
 ### Common Issues
@@ -110,6 +157,10 @@ Add InfluxDB as data source:
   - Check ~/.signalk directory permissions
   - Verify the Docker volume mount in docker-compose.yaml
 
+- **Symptom**: Update service can't write to ~/.data-hub
+  - Check directory permissions
+  - Verify Docker socket mount permissions
+
 #### 3. No Data Flow
 - Verify SignalK to InfluxDB plugin is installed and configured
 - Check container logs:
@@ -117,11 +168,26 @@ Add InfluxDB as data source:
   docker logs signalk
   docker logs influxdb
   docker logs grafana
+  docker logs system-metrics
+  docker logs update-service
   ```
 - Verify network connectivity between containers
+
+#### 4. Update Issues
+- **Symptom**: Updates not being applied
+  - Check update service logs
+  - Verify GitHub connectivity
+  - Check manifest file syntax
+  - Verify Docker socket permissions
+
+- **Symptom**: Failed updates
+  - Check version.yml format
+  - Verify manifest file paths
+  - Check service restart permissions
 
 ## Safety Notes
 - Always backup before updates
 - Monitor system resources
 - Keep spare SD card with known working configuration
 - Test major changes in development first
+- Monitor update service logs for issues

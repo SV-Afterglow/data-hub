@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements first for better caching
-COPY services/update-service/requirements.txt .
+COPY services/update_service/requirements.txt .
 
 # Force pure Python implementation of msgpack
 ENV MSGPACK_PUREPYTHON=1
@@ -20,7 +20,7 @@ ENV MSGPACK_PUREPYTHON=1
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy service code
-COPY services/update-service/updater.py .
+COPY services/update_service/updater.py .
 
 # Make script executable
 RUN chmod +x updater.py

@@ -9,7 +9,7 @@ import logging
 import subprocess
 from pathlib import Path
 from datetime import datetime
-from packaging import version
+from packaging.version import parse as parse_version
 from influxdb import InfluxDBClient
 
 # Configuration from environment variables
@@ -24,7 +24,6 @@ INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
 INFLUX_DB = "system_updates"
 NETWORK_NAME = 'data-hub_data-hub'
 
-[Previous code unchanged until build section in restart_services]
 # Setup logging with more detail
 logging.basicConfig(
     level=logging.DEBUG,  # Changed to DEBUG for more detail
@@ -35,7 +34,7 @@ logger = logging.getLogger('update-service')
 def compare_versions(v1, v2):
     """Compare two version strings."""
     try:
-        return version.parse(v1) > version.parse(v2)
+        return parse_version(v1) > parse_version(v2)
     except Exception as e:
         logger.error(f"Version comparison error: {e}")
         return False
@@ -204,18 +203,26 @@ class UpdateService:
             logger.error(f"Update verification failed: {e}")
             return False
 
-    def restart_services(self):
-        """Restart all services using docker commands."""
+    def restart_services(self, services_to_restart=None):
+        """Restart specified services using docker commands."""
         try:
             logger.debug("Reading docker-compose.yml")
             with open(COMPOSE_FILE, 'r') as f:
                 compose_data = yaml.safe_load(f)
-                services = compose_data.get('services', {}).keys()
+                available_services = compose_data.get('services', {}).keys()
 
-            logger.debug(f"Found services: {services}")
+            logger.debug(f"Found services: {available_services}")
 
-            # Only restart InfluxDB, not ourselves
-            services_to_restart = {'influxdb'}
+            # If no services specified, restart all except ourselves and watchtower
+            if services_to_restart is None:
+                services_to_restart = set(available_services) - {'update_service', 'watchtower'}
+            else:
+                # Validate specified services exist
+                invalid_services = services_to_restart - set(available_services)
+                if invalid_services:
+                    raise Exception(f"Invalid services specified: {invalid_services}")
+
+            logger.debug(f"Services to restart: {services_to_restart}")
 
             # Ensure network exists
             self.ensure_network()
@@ -299,12 +306,23 @@ class UpdateService:
                         logger.debug(f"Context: {context}")
                         logger.debug(f"Dockerfile: {dockerfile}")
 
-                        # Use the repository root as build context
-                        repo_root = REPO_ROOT
+                        # Use the correct build context from docker-compose
+                        build_context = service_config['build'].get('context', '.')
+                        dockerfile_path = service_config['build'].get('dockerfile')
+                        
+                        # Resolve paths relative to REPO_ROOT
+                        context_path = REPO_ROOT / build_context.lstrip('./')
+                        if dockerfile_path:
+                            dockerfile_path = REPO_ROOT / dockerfile_path.lstrip('./')
+                        
+                        logger.debug(f"Building {service_name} with context: {context_path}, dockerfile: {dockerfile_path}")
+                        
+                        # Build the image
                         self.docker_client.images.build(
-                            path=str(repo_root),
-                            dockerfile=str(repo_root / dockerfile) if dockerfile else None,
-                            tag=tag
+                            path=str(context_path),
+                            dockerfile=str(dockerfile_path) if dockerfile_path else None,
+                            tag=tag,
+                            nocache=True  # Force rebuild to ensure changes are picked up
                         )
 
                         run_kwargs['image'] = tag
@@ -369,6 +387,10 @@ class UpdateService:
         logger.info(f"Starting update to version {version}")
         start_time = time.time()
         
+        # Initialize step tracking
+        completed_steps = 0
+        total_steps = 0
+        
         # Create backup
         backup_path = self.backup_system()
         if not backup_path:
@@ -383,6 +405,14 @@ class UpdateService:
             response.raise_for_status()
             manifest = yaml.safe_load(response.text)
             logger.debug(f"Manifest content: {manifest}")
+
+            # Validate version requirement
+            if 'requires' in manifest:
+                current = self.get_current_version()
+                required = manifest['requires']
+                if parse_version(current) < parse_version(required):
+                    raise Exception(f"Current version {current} does not meet required version {required}")
+                logger.debug(f"Version requirement satisfied: {current} >= {required}")
 
             # Track step completion
             total_steps = len(manifest.get('steps', []))
@@ -408,10 +438,20 @@ class UpdateService:
                         logger.debug(f"Downloading config from {config_url}")
                         response = requests.get(config_url)
                         response.raise_for_status()
-                        target_path = REPO_ROOT / step['target'].lstrip('/data/data-hub/')  # Update target path to use repo root
+                        # Handle both absolute and relative paths
+                        target = step['target']
+                        if target.startswith('/data/data-hub/'):
+                            target = target.lstrip('/data/data-hub/')
+                        target_path = REPO_ROOT / target
                         os.makedirs(os.path.dirname(target_path), exist_ok=True)
                         with open(target_path, 'w') as f:
                             f.write(response.text)
+                        
+                        # Set file permissions if specified
+                        if 'permissions' in step:
+                            mode = int(step['permissions'], 8)  # Convert octal string to int
+                            os.chmod(str(target_path), mode)  # Convert Path to string for chmod
+                            logger.debug(f"Set permissions {step['permissions']} on {target_path}")
                     elif step_type == 'system_package':
                         # Skip system package installation
                         logger.info(f"Skipping system package installation of {step['package']} (handled by Dockerfile)")
@@ -443,10 +483,21 @@ class UpdateService:
             with open(self.version_file, 'w') as f:
                 yaml.dump({'version': version}, f)
 
-            # Restart services
-            logger.debug("Restarting services")
-            if not self.restart_services():
-                raise Exception("Failed to restart services")
+            # Handle service restarts
+            services_to_restart = set()
+            for step in manifest.get('steps', []):
+                if step['type'] == 'docker_compose' and step.get('action') == 'restart':
+                    if 'service' in step:
+                        services_to_restart.add(step['service'])
+                    else:
+                        # If no specific service, restart all
+                        services_to_restart = self.get_expected_services() - {'update-service', 'watchtower'}
+                        break
+
+            if services_to_restart:
+                logger.debug(f"Restarting services: {services_to_restart}")
+                if not self.restart_services(services_to_restart):
+                    raise Exception("Failed to restart services")
 
             # Verify update
             logger.debug("Verifying update")
@@ -517,4 +568,3 @@ class UpdateService:
 if __name__ == "__main__":
     service = UpdateService()
     service.run()
-
