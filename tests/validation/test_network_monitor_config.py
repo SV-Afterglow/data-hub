@@ -87,7 +87,7 @@ class TestNetworkMonitorConfig:
             # Check required packages
             required_packages = [
                 "speedtest-cli",
-                "influxdb-client",
+                "influxdb",
                 "python-wifi",
                 "iwlib",
                 "schedule"
