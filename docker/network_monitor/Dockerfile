@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     gcc \
     python3-dev \
     libiw-dev \
+    libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -25,6 +26,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     wireless-tools \
     libiw-dev \
+    libffi-dev \
     speedtest-cli \
     && rm -rf /var/lib/apt/lists/*
 
