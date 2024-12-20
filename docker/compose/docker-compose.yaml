@@ -83,16 +83,15 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc:/etc:ro
       - ~/.data-hub:/data
-      - ../..:/app/repo  # Mount repo root for access to Dockerfiles
+      - /home/admin/data-hub:/app/data-hub  # Mount local repo for updates (writable)
     environment:
       - GITHUB_REPO=sv-afterglow/data-hub
       - GITHUB_BRANCH=main
       - UPDATE_CHECK_INTERVAL=3600
       - INFLUX_URL=http://influxdb:8086
-      - DATA_DIR=/app  # Set data dir to container working directory
+      - DATA_DIR=/data  # Set data dir to mounted volume
     depends_on:
       - influxdb  # Ensure influxdb starts first
-    working_dir: /app/repo  # Set working directory to repo root
     networks:
       - data-hub
 
@@ -119,14 +118,12 @@ services:
       - "com.centurylinklabs.watchtower.enable=false"  # Managed by update-service
     volumes:
       - /etc/localtime:/etc/localtime:ro  # System time sync
-      - /proc/net/dev:/proc/net/dev:ro    # Network interface stats
-      - /sys/class/net:/sys/class/net:ro  # Network interface info
       - ~/.data-hub:/data                 # Persistent data
     environment:
       - NETWORK_INTERFACE=wlan0
       - SPEED_TEST_INTERVAL=3600
       - WIFI_CHECK_INTERVAL=30
-      - INFLUX_URL=http://influxdb:8086
+      - INFLUX_URL=http://localhost:8086  # Use localhost since we're in host network mode
       - MIN_SPEED_TEST_INTERVAL=600
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health')"]
@@ -142,4 +139,5 @@ services:
 
 networks:
   data-hub:
+    name: data-hub
     driver: bridge

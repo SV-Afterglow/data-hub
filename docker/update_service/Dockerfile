@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements first for better caching
-COPY services/update_service/requirements.txt .
+COPY services/update_service/requirements.txt requirements.txt
 
 # Force pure Python implementation of msgpack
 ENV MSGPACK_PUREPYTHON=1
@@ -20,9 +20,12 @@ ENV MSGPACK_PUREPYTHON=1
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy service code
-COPY services/update_service/updater.py .
+COPY services/update_service/updater.py updater.py
 
 # Make script executable
 RUN chmod +x updater.py
 
-CMD ["./updater.py"]
+# Set working directory for mounted repo
+WORKDIR /app/repo
+
+CMD ["python", "/app/updater.py"]

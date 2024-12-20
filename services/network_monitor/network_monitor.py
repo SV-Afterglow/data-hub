@@ -7,9 +7,36 @@ import logging
 import schedule
 import subprocess
 import speedtest
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 from influxdb import InfluxDBClient
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/health':
+            try:
+                # Get health status from NetworkMonitor
+                is_healthy, message = self.server.network_monitor.check_health()
+                if is_healthy:
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "healthy", "message": message}).encode())
+                else:
+                    self.send_response(503)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "unhealthy", "message": message}).encode())
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
 
 # Configuration from environment variables
 NETWORK_INTERFACE = os.getenv('NETWORK_INTERFACE', 'wlan0')
@@ -28,7 +55,15 @@ logger = logging.getLogger('network_monitor')
 class NetworkMonitor:
     def __init__(self):
         """Initialize the network monitor."""
-        self.influx_client = InfluxDBClient(host='influxdb', port=8086)
+        # Parse InfluxDB URL from environment
+        influx_url = os.environ.get('INFLUX_URL', 'http://influxdb:8086')
+        # Extract host and port from URL
+        from urllib.parse import urlparse
+        parsed = urlparse(influx_url)
+        self.influx_client = InfluxDBClient(
+            host=parsed.hostname,
+            port=parsed.port or 8086
+        )
         self.speedtest_client = speedtest.Speedtest()
         self.last_wifi_status = None
         self.last_speed_test = 0
@@ -220,9 +255,21 @@ class NetworkMonitor:
         except Exception as e:
             return False, str(e)
 
+    def start_health_server(self):
+        """Start health check HTTP server."""
+        server = HTTPServer(('', 8080), HealthCheckHandler)
+        server.network_monitor = self
+        thread = threading.Thread(target=server.serve_forever)
+        thread.daemon = True
+        thread.start()
+        logger.info("Health check server started on port 8080")
+
     def run(self):
         """Main monitoring loop."""
         logger.info(f"Starting network monitor for interface {NETWORK_INTERFACE}")
+        
+        # Start health check server
+        self.start_health_server()
         
         # Schedule regular checks
         schedule.every(WIFI_CHECK_INTERVAL).seconds.do(

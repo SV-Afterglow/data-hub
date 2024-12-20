@@ -18,8 +18,8 @@ GITHUB_BRANCH = os.getenv('GITHUB_BRANCH', 'main')
 CHECK_INTERVAL = int(os.getenv('UPDATE_CHECK_INTERVAL', '3600'))  # Default 1 hour
 DATA_DIR = Path(os.getenv('DATA_DIR', '/data'))
 HOME_DIR = Path(os.path.expanduser('~'))
-REPO_ROOT = DATA_DIR / 'data-hub'  # Repository root path
-COMPOSE_FILE = REPO_ROOT / 'docker/compose/docker-compose.yaml'  # Compose file relative to repo root
+REPO_ROOT = Path('/app/data-hub')  # Local repository mount
+COMPOSE_FILE = REPO_ROOT / 'docker/compose/docker-compose.yaml'  # Compose file in repo
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
 INFLUX_DB = "system_updates"
 NETWORK_NAME = 'data-hub_data-hub'
@@ -353,7 +353,7 @@ class UpdateService:
             compose_backup = Path(backup_path) / 'docker-compose.yaml'
             if compose_backup.exists():
                 with open(compose_backup, 'r') as src:
-                    with open(COMPOSE_FILE, 'w') as dst:
+                    with open('/app/data-hub/docker/compose/docker-compose.yaml', 'w') as dst:
                         dst.write(src.read())
 
             # Restore service configurations
