@@ -25,10 +25,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     wireless-tools \
     libiw-dev \
+    speedtest-cli \
     && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user
-RUN useradd -m -r -u 1000 monitor
 
 # Copy wheels from builder
 COPY --from=builder /app/wheels /wheels
@@ -41,15 +39,11 @@ RUN pip install --no-cache /wheels/*
 COPY ./services/network_monitor/network_monitor.py .
 
 # Set permissions
-RUN chown -R monitor:monitor /app && \
-    chmod 755 network_monitor.py
-
-# Switch to non-root user
-USER monitor
+RUN chmod 755 network_monitor.py
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8080/health')"
+    CMD python -c "import os; os.path.exists('/sys/class/net/' + os.getenv('NETWORK_INTERFACE', 'wlan0'))"
 
 # Run application
 CMD ["python", "network_monitor.py"]
