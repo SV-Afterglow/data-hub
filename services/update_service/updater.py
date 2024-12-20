@@ -242,10 +242,13 @@ class UpdateService:
 
             # Start services using docker-compose
             try:
-                subprocess.run(['docker-compose', '-f', str(COMPOSE_FILE), 'up', '-d'] + list(services_to_restart), check=True)
+                cmd = ['docker-compose', '-f', str(COMPOSE_FILE), 'up', '-d']
+                cmd.extend(list(services_to_restart))
+                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+                logger.debug(f"docker-compose output: {result.stdout}")
                 return True
             except subprocess.CalledProcessError as e:
-                logger.error(f"Failed to start services: {e}")
+                logger.error(f"Failed to start services: {e}\nOutput: {e.stdout}\nError: {e.stderr}")
                 raise
 
         except Exception as e:
