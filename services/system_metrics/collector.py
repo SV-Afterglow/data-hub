@@ -31,7 +31,7 @@ def get_system_metrics():
     # CPU metrics
     cpu_metrics = {
         'cpu_percent': psutil.cpu_percent(interval=1),
-        'cpu_freq': psutil.cpu_freq().current if psutil.cpu_freq() else 0,
+        'cpu_freq': psutil.cpu_freq().current if psutil.cpu_freq() else 0
     }
     metrics.append({
         "measurement": "cpu",
