@@ -5,18 +5,18 @@ description: "Improved system metrics organization with separate measurements an
 
 steps:
   - type: "service_config"
-    path: "services/system-metrics/collector.py"
-    target: "/data/services/system-metrics/collector.py"
+    path: "services/system_metrics/collector.py"
+    target: "/data/services/system_metrics/collector.py"
     description: "Update system metrics collector with improved measurements and tags"
     permissions: "755"
 
   - type: "docker_compose"
-    description: "Restart system-metrics service to apply changes"
-    service: "system-metrics"
+    description: "Restart system_metrics service to apply changes"
+    service: "system_metrics"
     action: "restart"
 
 rollback:
   supported: true
   steps:
     - "Restore previous collector.py"
-    - "Restart system-metrics service"
+    - "Restart system_metrics service"
