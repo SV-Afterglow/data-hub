@@ -242,10 +242,23 @@ class UpdateService:
 
             # Start services using docker-compose
             try:
-                cmd = ['docker-compose', '-f', str(COMPOSE_FILE), 'up', '-d']
-                cmd.extend(list(services_to_restart))
-                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-                logger.debug(f"docker-compose output: {result.stdout}")
+                # First stop all services to release ports
+                stop_cmd = ['docker-compose', '-f', str(COMPOSE_FILE), 'stop']
+                stop_cmd.extend(list(services_to_restart))
+                stop_result = subprocess.run(stop_cmd, check=True, capture_output=True, text=True)
+                logger.debug(f"docker-compose stop output: {stop_result.stdout}")
+
+                # Remove containers to ensure clean state
+                rm_cmd = ['docker-compose', '-f', str(COMPOSE_FILE), 'rm', '-f']
+                rm_cmd.extend(list(services_to_restart))
+                rm_result = subprocess.run(rm_cmd, check=True, capture_output=True, text=True)
+                logger.debug(f"docker-compose rm output: {rm_result.stdout}")
+
+                # Start services
+                up_cmd = ['docker-compose', '-f', str(COMPOSE_FILE), 'up', '-d']
+                up_cmd.extend(list(services_to_restart))
+                up_result = subprocess.run(up_cmd, check=True, capture_output=True, text=True)
+                logger.debug(f"docker-compose up output: {up_result.stdout}")
                 return True
             except subprocess.CalledProcessError as e:
                 logger.error(f"Failed to start services: {e}\nOutput: {e.stdout}\nError: {e.stderr}")
