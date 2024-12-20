@@ -239,103 +239,14 @@ class UpdateService:
                     logger.debug(f"Container {container_name} not found")
                     pass  # Container doesn't exist, which is fine
 
-            # Pull latest images
-            for service in services_to_restart:
-                image_name = compose_data['services'][service].get('image')
-                if image_name:
-                    try:
-                        logger.debug(f"Pulling image {image_name}")
-                        self.docker_client.images.pull(image_name)
-                    except Exception as e:
-                        logger.error(f"Failed to pull image for {service}: {e}")
+            # Start services using docker-compose
+            try:
+                subprocess.run(['docker-compose', '-f', str(COMPOSE_FILE), 'up', '-d'] + list(services_to_restart), check=True)
+                return True
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to start services: {e}")
+                raise
 
-            # Start services using docker run
-            for service_name in services_to_restart:
-                service_config = compose_data['services'][service_name]
-                container_name = f"data-hub_{service_name}_1"
-                logger.debug(f"Starting service {service_name}")
-                
-                # Basic configuration
-                run_kwargs = {
-                    'name': container_name,
-                    'detach': True,
-                    'restart_policy': {"Name": "always"},
-                }
-
-                # Add environment variables
-                if 'environment' in service_config:
-                    run_kwargs['environment'] = service_config['environment']
-
-                # Add volumes with absolute paths
-                if 'volumes' in service_config:
-                    volumes = {}
-                    for volume in service_config['volumes']:
-                        host_path, container_path = volume.split(':')
-                        # Replace ~ with absolute path
-                        if host_path.startswith('~'):
-                            host_path = str(HOME_DIR) + host_path[1:]
-                        volumes[host_path] = {'bind': container_path, 'mode': 'rw'}
-                    run_kwargs['volumes'] = volumes
-
-                # Add ports
-                if 'ports' in service_config:
-                    ports = {}
-                    for port_mapping in service_config['ports']:
-                        host_port, container_port = port_mapping.split(':')
-                        ports[container_port] = host_port
-                    run_kwargs['ports'] = ports
-
-                # Add network mode if specified
-                if 'network_mode' in service_config:
-                    run_kwargs['network_mode'] = service_config['network_mode']
-                elif 'networks' in service_config:
-                    run_kwargs['network'] = NETWORK_NAME
-
-                # Add command if specified
-                if 'command' in service_config:
-                    run_kwargs['command'] = service_config['command']
-
-                try:
-                    if 'build' in service_config:
-                        # Build the image locally
-                        context = service_config['build'].get('context', '.')
-                        dockerfile = service_config['build'].get('dockerfile')
-                        tag = f"data-hub_{service_name}:latest"
-                        
-                        logger.debug(f"Building image for {service_name}")
-                        logger.debug(f"Context: {context}")
-                        logger.debug(f"Dockerfile: {dockerfile}")
-
-                        # Use the correct build context from docker-compose
-                        build_context = service_config['build'].get('context', '.')
-                        dockerfile_path = service_config['build'].get('dockerfile')
-                        
-                        # Resolve paths relative to REPO_ROOT
-                        context_path = REPO_ROOT / build_context.lstrip('./')
-                        if dockerfile_path:
-                            dockerfile_path = REPO_ROOT / dockerfile_path.lstrip('./')
-                        
-                        logger.debug(f"Building {service_name} with context: {context_path}, dockerfile: {dockerfile_path}")
-                        
-                        # Build the image
-                        self.docker_client.images.build(
-                            path=str(context_path),
-                            dockerfile=str(dockerfile_path) if dockerfile_path else None,
-                            tag=tag,
-                            nocache=True  # Force rebuild to ensure changes are picked up
-                        )
-
-                        run_kwargs['image'] = tag
-                    else:
-                        run_kwargs['image'] = service_config['image']
-
-                    logger.debug(f"Running container with args: {run_kwargs}")
-                    self.docker_client.containers.run(**run_kwargs)
-                except Exception as e:
-                    logger.error(f"Failed to start {service_name}: {e}")
-                    raise
-
-            return True
         except Exception as e:
             logger.error(f"Failed to restart services: {e}")
             return False
