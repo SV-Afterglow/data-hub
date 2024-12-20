@@ -22,7 +22,8 @@ REPO_ROOT = DATA_DIR / 'data-hub'  # Repository root path
 COMPOSE_FILE = REPO_ROOT / 'docker/compose/docker-compose.yaml'  # Compose file relative to repo root
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb:8086')
 INFLUX_DB = "system_updates"
-NETWORK_NAME = 'data-hub_data-hub'
+PROJECT_NAME = 'compose'
+NETWORK_NAME = f'{PROJECT_NAME}_data-hub'
 
 # Setup logging with more detail
 logging.basicConfig(
@@ -229,7 +230,7 @@ class UpdateService:
 
             # Stop and remove existing containers
             for service in services_to_restart:
-                container_name = f"data-hub_{service}_1"
+                container_name = f"{PROJECT_NAME}_{service}_1"
                 try:
                     logger.debug(f"Stopping container {container_name}")
                     container = self.docker_client.containers.get(container_name)
