@@ -1,3 +1,3 @@
-version: "1.1.1"
-release_date: "2024-12-17"
-description: "Improved system metrics organization with separate measurements and tags"
+version: "1.1.2"
+release_date: "2024-12-21"
+description: "Fixed network configuration and update service paths"
