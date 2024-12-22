@@ -255,11 +255,19 @@ print_header "Creating Data Hub Directory Structure"
 print_step "Setting up data hub directories..."
 
 DATA_DIR="$HOME/.data-hub"
+GRAFANA_DIR="$HOME/grafana-data"
+SIGNALK_DIR="$HOME/.signalk"
+
+# Create data hub directories
 mkdir -p "$DATA_DIR/state"
 mkdir -p "$DATA_DIR/config/update_service"
 mkdir -p "$DATA_DIR/config/system_metrics"
 mkdir -p "$DATA_DIR/config/network_monitor"
 mkdir -p "$DATA_DIR/backups"
+
+# Create service data directories
+mkdir -p "$GRAFANA_DIR"
+mkdir -p "$SIGNALK_DIR"
 
 # Copy initial service configurations
 print_step "Copying initial service configurations..."
@@ -286,11 +294,11 @@ fi
 
 # Set service-specific permissions
 print_step "Setting service permissions..."
-if ! log_cmd_output "sudo chown -R 999:999 $DATA_DIR/config/influxdb"; then
-    handle_error "Failed to set InfluxDB permissions" "$(tail -n 20 "$LOG_FILE")"
-fi
-if ! log_cmd_output "sudo chown -R 472:472 $DATA_DIR/config/grafana"; then
+if ! log_cmd_output "sudo chown -R 472:472 $GRAFANA_DIR"; then
     handle_error "Failed to set Grafana permissions" "$(tail -n 20 "$LOG_FILE")"
+fi
+if ! log_cmd_output "sudo chown -R 1000:1000 $SIGNALK_DIR"; then
+    handle_error "Failed to set SignalK permissions" "$(tail -n 20 "$LOG_FILE")"
 fi
 
 print_success "Data Hub directory structure initialized"
