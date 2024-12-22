@@ -250,19 +250,50 @@ fi
 fi
 print_success "Kernel modules configured"
 
-# Data Directories
-print_header "Creating Data Directories"
-print_step "Setting up service directories..."
-if ! log_cmd_output "mkdir -p ~/influxdb-data ~/.signalk ~/grafana-data"; then
-    handle_error "Failed to create data directories" "$(tail -n 20 "$LOG_FILE")"
+# Data Hub Directory Structure
+print_header "Creating Data Hub Directory Structure"
+print_step "Setting up data hub directories..."
+
+DATA_DIR="$HOME/.data-hub"
+mkdir -p "$DATA_DIR/state"
+mkdir -p "$DATA_DIR/config/update_service"
+mkdir -p "$DATA_DIR/config/system_metrics"
+mkdir -p "$DATA_DIR/config/network_monitor"
+mkdir -p "$DATA_DIR/backups"
+
+# Copy initial service configurations
+print_step "Copying initial service configurations..."
+cp services/update_service/settings.yml "$DATA_DIR/config/update_service/"
+cp services/system_metrics/settings.yml "$DATA_DIR/config/system_metrics/"
+cp services/network_monitor/settings.yml "$DATA_DIR/config/network_monitor/"
+
+# Initialize version state
+print_step "Initializing version state..."
+if [ -f "version.yml" ]; then
+    cp version.yml "$DATA_DIR/state/version"
+else
+    echo "version: \"1.0.0\"" > "$DATA_DIR/state/version"
 fi
 
-# Set correct permissions for data directories
-print_step "Setting correct permissions for data directories..."
-if ! log_cmd_output "sudo chown -R 999:999 ~/influxdb-data && sudo chown -R 472:472 ~/grafana-data"; then
+# Set base permissions
+print_step "Setting base permissions..."
+if ! log_cmd_output "sudo chown -R $USER:$USER $DATA_DIR"; then
+    handle_error "Failed to set base permissions" "$(tail -n 20 "$LOG_FILE")"
+fi
+if ! log_cmd_output "sudo chmod -R 755 $DATA_DIR"; then
     handle_error "Failed to set directory permissions" "$(tail -n 20 "$LOG_FILE")"
 fi
-print_success "Data directories created and permissions set"
+
+# Set service-specific permissions
+print_step "Setting service permissions..."
+if ! log_cmd_output "sudo chown -R 999:999 $DATA_DIR/config/influxdb"; then
+    handle_error "Failed to set InfluxDB permissions" "$(tail -n 20 "$LOG_FILE")"
+fi
+if ! log_cmd_output "sudo chown -R 472:472 $DATA_DIR/config/grafana"; then
+    handle_error "Failed to set Grafana permissions" "$(tail -n 20 "$LOG_FILE")"
+fi
+
+print_success "Data Hub directory structure initialized"
 
 # InfluxDB Configuration
 print_header "InfluxDB Configuration"
@@ -292,15 +323,20 @@ if ! cat > docker-compose.yml << EOF
 version: '3'
 services:
   signalk:
-    image: signalk/signalk-server:latest
+    image: ghcr.io/sv-afterglow/data-hub/signalk:latest
     restart: always
     network_mode: host
     volumes:
       - ~/.signalk:/home/node/.signalk
       - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/signalk"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   influxdb:
-    image: influxdb:1.8
+    image: ghcr.io/sv-afterglow/data-hub/influxdb:latest
     restart: always
     ports:
       - "8086:8086"
@@ -308,12 +344,16 @@ services:
       - ~/influxdb-data:/var/lib/influxdb
       - ~/influxdb.conf:/etc/influxdb/influxdb.conf:ro
     environment:
-      - INFLUXDB_DB=signalk
       - INFLUXDB_HTTP_AUTH_ENABLED=false
     user: "999:999"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   grafana:
-    image: grafana/grafana:latest
+    image: ghcr.io/sv-afterglow/data-hub/grafana:latest
     restart: always
     ports:
       - "3001:3000"
@@ -326,19 +366,49 @@ services:
     user: "472:472"
     depends_on:
       - influxdb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  system-metrics:
+  system_metrics:
     build:
       context: .
-      dockerfile: docker/system-metrics/Dockerfile
-    image: ghcr.io/sv-afterglow/data-hub/system-metrics:latest
+      dockerfile: docker/system_metrics/Dockerfile
+    image: ghcr.io/sv-afterglow/data-hub/system_metrics:latest
     restart: always
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /sys/class/thermal:/sys/class/thermal:ro
-    environment:
-      - INFLUX_URL=http://influxdb:8086
-      - COLLECTION_INTERVAL=10
+      - ~/.data-hub/config/system_metrics:/data/config/system_metrics:ro
+    depends_on:
+      - influxdb
+
+  network_monitor:
+    image: ghcr.io/sv-afterglow/data-hub/network_monitor:latest
+    restart: always
+    network_mode: host
+    volumes:
+      - ~/.data-hub/config/network_monitor:/data/config/network_monitor:ro
+    depends_on:
+      - influxdb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  update_service:
+    build:
+      context: .
+      dockerfile: docker/update_service/Dockerfile
+    image: ghcr.io/sv-afterglow/data-hub/update_service:latest
+    restart: always
+    volumes:
+      - ~/.data-hub/config/update_service:/data/config/update_service:ro
+      - ~/.data-hub/state:/data/state
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - influxdb
 
@@ -348,6 +418,11 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command: --cleanup --interval 30
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 EOF
 then
     handle_error "Failed to create docker-compose configuration" "$(tail -n 20 "$LOG_FILE")"
