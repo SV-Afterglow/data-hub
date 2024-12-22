@@ -1,0 +1,36 @@
+# System Metrics Service Configuration
+
+collection:
+  interval: 10  # Collection interval in seconds
+  metrics:
+    - cpu_usage
+    - memory_usage
+    - disk_usage
+    - temperature
+    - load_average
+    - network_io
+
+influxdb:
+  url: http://influxdb:8086
+  database: system_metrics
+  retention: 30d  # Keep metrics for 30 days
+
+thresholds:
+  cpu:
+    warning: 80  # Percentage
+    critical: 90
+  memory:
+    warning: 80  # Percentage
+    critical: 90
+  disk:
+    warning: 80  # Percentage
+    critical: 90
+  temperature:
+    warning: 70  # Celsius
+    critical: 80
+
+logging:
+  level: INFO
+  file: collector.log
+  max_size: 10MB
+  backup_count: 5

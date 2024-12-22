@@ -56,6 +56,23 @@ data-hub/
     └── restore.sh
 ```
 
+### Directory Structure
+
+```
+~/.data-hub/          # Main data directory
+├── state/            # System state
+│   ├── version      # Current version
+│   └── updates/     # Update history
+├── config/          # Service configurations
+│   ├── influxdb/    # InfluxDB data and config
+│   ├── grafana/     # Grafana dashboards and settings
+│   ├── signalk/     # SignalK configuration
+│   ├── network_monitor/    # Network monitoring service
+│   ├── update_service/     # Update management service
+│   └── system_metrics/     # System metrics service
+└── backups/         # System backups
+```
+
 ### Data Flow
 1. NMEA2000 data is received through the PICAN-M HAT
 2. SignalK processes and normalizes the data
@@ -66,9 +83,13 @@ data-hub/
 ### Update Flow
 1. Update service checks for new versions periodically
 2. New versions are detected via version.yml and manifest files
-3. Updates are automatically downloaded and applied
-4. Services are restarted as needed
-5. Update status is logged to InfluxDB
+3. System state and configs are backed up
+4. Updates are downloaded and applied to the correct locations:
+   - Service configs go to ~/.data-hub/config/
+   - Version state is updated in ~/.data-hub/state/
+   - Update history is tracked in ~/.data-hub/state/updates/
+5. Services are restarted as needed
+6. Update status is logged to InfluxDB
 
 ## Features
 
@@ -110,8 +131,35 @@ data-hub/
 1. Create service directory in services/
 2. Add Dockerfile in docker/service-name/
 3. Update docker-compose.yaml
-4. Add service to update manifests
-5. Document in appropriate README
+4. Add service configuration to ~/.data-hub/config/
+5. Add service to update manifests
+6. Document in appropriate README
+
+### Configuration Management
+1. Service Configurations
+   - All service configs live in ~/.data-hub/config/
+   - Updates modify configs through manifest steps
+   - Backups preserve configs for rollback
+
+2. System State
+   - Version info stored in ~/.data-hub/state/version
+   - Update history in ~/.data-hub/state/updates/
+   - State changes are atomic and backed up
+
+3. Data Persistence
+   - InfluxDB data: ~/.data-hub/config/influxdb/
+   - Grafana data: ~/.data-hub/config/grafana/
+   - SignalK data: ~/.data-hub/config/signalk/
+   - Update service: ~/.data-hub/config/update_service/
+     - settings.yml: GitHub repo, branch, intervals
+     - history.log: Detailed update logs
+     - metrics.db: Update metrics and status
+   - System metrics: ~/.data-hub/config/system_metrics/
+     - settings.yml: Collection intervals, thresholds
+     - collector.log: Metrics collection logs
+   - Network monitor: ~/.data-hub/config/network_monitor/
+     - settings.yml: Network interfaces, intervals
+     - monitor.log: Network status logs
 
 ## Support
 

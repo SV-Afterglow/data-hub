@@ -1,0 +1,19 @@
+# Update Service Configuration
+
+github:
+  repo: sv-afterglow/data-hub
+  branch: main
+
+intervals:
+  update_check: 3600  # Check for updates every hour
+  metrics_flush: 300  # Flush metrics to InfluxDB every 5 minutes
+
+logging:
+  level: DEBUG
+  file: history.log
+  max_size: 10MB
+  backup_count: 5
+
+metrics:
+  database: update_service
+  retention: 30d  # Keep metrics for 30 days

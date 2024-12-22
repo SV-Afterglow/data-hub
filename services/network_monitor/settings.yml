@@ -1,0 +1,52 @@
+# Network Monitor Service Configuration
+
+network:
+  interface: wlan0  # Primary network interface to monitor
+  backup_interface: eth0  # Fallback interface
+  speed_test:
+    interval: 3600  # Run speed test every hour
+    min_interval: 600  # Minimum time between tests
+    providers:
+      - speedtest-cli
+      - fast.com
+  wifi:
+    check_interval: 30  # Check WiFi status every 30 seconds
+    min_signal: -70  # Minimum acceptable signal strength (dBm)
+    preferred_networks:
+      - ssid: "Afterglow"
+        priority: 1
+      - ssid: "Marina WiFi"
+        priority: 2
+
+influxdb:
+  url: http://influxdb:8086
+  database: network_monitor
+  retention: 30d  # Keep metrics for 30 days
+
+thresholds:
+  speed:
+    download:
+      warning: 5  # Mbps
+      critical: 1
+    upload:
+      warning: 2  # Mbps
+      critical: 0.5
+  latency:
+    warning: 200  # ms
+    critical: 500
+  signal:
+    warning: -70  # dBm
+    critical: -80
+
+logging:
+  level: INFO
+  file: monitor.log
+  max_size: 10MB
+  backup_count: 5
+
+health_check:
+  port: 8080
+  interval: 30
+  timeout: 10
+  retries: 3
+  start_period: 5
