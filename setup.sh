@@ -211,7 +211,6 @@ if ! dmesg | grep -q "mcp251x spi0.0"; then
     echo ""
     print_info "The script will continue, but CAN functionality won't work until the HAT is properly installed."
     echo ""
-    read -p "$(echo -e ${BLUE}Press Enter to continue or Ctrl+C to exit...${NC})"
 fi
 
 # CAN Configuration
