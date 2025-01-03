@@ -1,177 +1,151 @@
-# Data Hub
+Below is an updated README reflecting our new naming conventions and the custom update service approach (instead of Watchtower). It also highlights the high-level features, folder structure, and recommended workflow. Feel free to adjust any wording to match your style or repo specifics!
 
-Primary vessel data hub and systems interface, based on the SeaBits NMEA 2000 Raspberry Pi implementation. This system manages NMEA2000 network access, hosts SignalK server, and provides data visualization through Grafana with historical data storage in InfluxDB.
+Data Hub
 
-## Overview
+Overview
 
-The Data Hub serves as a central nervous system for vessel data, providing:
-- NMEA2000 network connectivity
-- Real-time data processing through SignalK
-- Time-series data storage in InfluxDB
-- Data visualization via Grafana dashboards
-- System performance monitoring
-- Automated updates and maintenance
+The Data Hub serves as the primary vessel data hub and systems interface, originally inspired by the SeaBits NMEA 2000 Raspberry Pi implementation. This system manages NMEA2000 network access, hosts a SignalK server, and provides data visualization through Grafana with historical data storage in InfluxDB.
 
-## Quick Start
+Key Capabilities
+	•	NMEA2000 Connectivity: Collect data from onboard sensors and instruments.
+	•	SignalK Integration: Normalize real-time data and make it accessible to other vessel systems.
+	•	Time-Series Storage (InfluxDB): Store historical data for trend analysis.
+	•	Visualization (Grafana): Create customized dashboards for monitoring vessel performance.
+	•	data-hub system Health & Metrics: Collect and display CPU, memory, disk usage, and more.
+	•	Automated Updates (Custom Updater): Check for new versions, back up configs, apply updates, and roll back if needed.
 
-1. Check the [Requirements](docs/REQUIREMENTS.md) to ensure your hardware is compatible
-2. Clone this repository:
-   ```bash
-   git clone https://github.com/yourusername/data-hub.git
-   cd data-hub
-   ```
-3. Run the setup script:
-   ```bash
-   ./setup.sh
-   ```
-4. Reboot your system when prompted
-5. Access your services:
-   - SignalK: http://localhost:3000
-   - Grafana: http://localhost:3001
-   - InfluxDB: http://localhost:8086
+Quick Start
+	1.	Clone the Repository
 
-For detailed manual installation steps and troubleshooting, see the [Installation Guide](docs/INSTALLATION.md).
+git clone https://github.com/<yourusername>/data-hub.git
+cd data-hub
 
-## Architecture
 
-```
+	2.	Review Hardware Requirements
+See Requirements to confirm hardware compatibility (e.g., Raspberry Pi with a PICAN-M HAT).
+	3.	Run Setup (Optional)
+
+./setup.sh
+
+	Depending on your environment, this script may install prerequisites and configure basic settings.
+
+	4.	Boot or Reboot
+If prompted, reboot your system or restart services.
+	5.	Access Your Services (default ports shown below; adjust as needed):
+	•	SignalK: http://localhost:3000
+	•	Grafana: http://localhost:3001
+	•	InfluxDB: http://localhost:8086
+
+For detailed manual installation steps and troubleshooting, see the Installation Guide.
+
+Architecture & Directory Structure
+
 data-hub/
-├── docker/              # Container configurations
-│   ├── compose/        # Docker compose files
-│   ├── signalk/       # SignalK server configuration
-│   ├── influxdb/      # InfluxDB configuration
-│   ├── grafana/       # Grafana configuration
-│   ├── system_metrics/ # System metrics collector
-│   └── update_service/ # Automated update service
-├── services/           # Application services
-│   ├── system_metrics/ # System metrics collector service
-│   └── update_service/ # Update management service
-├── updates/           # Version updates and manifests
-├── config/            # Application configs
-│   ├── signalk/
-│   ├── influxdb/
-│   └── grafana/
-└── scripts/           # Maintenance scripts
-    ├── backup.sh
-    └── restore.sh
-```
+├── docker/                # Docker container configurations (kebab-case folders)
+│   ├── compose/           # Docker Compose files
+│   │   └── docker-compose.yml
+│   ├── grafana/           # Grafana Dockerfile & config
+│   ├── influxdb/          # InfluxDB Dockerfile & config
+│   ├── signalk/           # SignalK Dockerfile & config
+│   └── update-service/    # Custom update service Dockerfile
+├── services/              # Python services (snake_case folders)
+│   ├── network_monitor/   # (example) Network monitoring service
+│   ├── system_metrics/    # System metrics collector
+│   └── update_service/    # Python code for the update manager
+├── docs/                  # Documentation & proposals
+│   ├── proposals/
+│   ├── ARCHITECTURE.md
+│   ├── INSTALLATION.md
+│   ├── REQUIREMENTS.md
+│   └── UPDATES.md
+├── version.yml            # Tracks current system version for the custom updater
+├── scripts/               # Optional scripts (backup, restore, etc.)
+└── updates/               # Version update manifests & related files
 
-### Directory Structure
+Data & Config Paths
 
-```
-~/.data-hub/          # Main data directory
-├── state/            # System state
-│   ├── version      # Current version
-│   └── updates/     # Update history
-├── config/          # Service configurations
-│   ├── influxdb/    # InfluxDB data and config
-│   ├── grafana/     # Grafana dashboards and settings
-│   ├── signalk/     # SignalK configuration
-│   ├── network_monitor/    # Network monitoring service
-│   ├── update_service/     # Update management service
-│   └── system_metrics/     # System metrics service
-└── backups/         # System backups
-```
+By default, persistent data and config files reside at ~/.data-hub/. This includes:
+	•	~/.data-hub/state/
+	•	version: current system version info
+	•	updates/: history of applied updates
+	•	~/.data-hub/config/
+	•	influxdb/, grafana/, signalk/, etc.
+	•	Additional subfolders for each service’s configs (network_monitor, update_service, etc.)
+	•	~/.data-hub/backups/
+	•	Automatic backups before major updates
 
-### Data Flow
-1. NMEA2000 data is received through the PICAN-M HAT
-2. SignalK processes and normalizes the data
-3. Data is stored in InfluxDB for historical analysis
-4. System metrics are collected and stored in InfluxDB
-5. Grafana visualizes both real-time and historical data
+Data Flow
+	1.	NMEA2000 Input: Data arrives via the PICAN-M HAT (or other interface).
+	2.	SignalK Normalization: SignalK processes raw messages and provides a unified data model.
+	3.	InfluxDB Storage: The normalized data is stored historically for trend analysis.
+	4.	System Metrics: Additional CPU, memory, disk usage, and other metrics also go into InfluxDB.
+	5.	Grafana Dashboards: Visualize real-time and historical data via dashboards on port 3001.
 
-### Update Flow
-1. Update service checks for new versions periodically
-2. New versions are detected via version.yml and manifest files
-3. System state and configs are backed up
-4. Updates are downloaded and applied to the correct locations:
-   - Service configs go to ~/.data-hub/config/
-   - Version state is updated in ~/.data-hub/state/
-   - Update history is tracked in ~/.data-hub/state/updates/
-5. Services are restarted as needed
-6. Update status is logged to InfluxDB
+Automated Updates (Custom Updater)
 
-## Features
+We have replaced Watchtower with a custom update service that:
+	1.	Checks Remote Version: Periodically compares the local version.yml to the remote repo’s version.
+	2.	Backs Up System: Creates backups of config/state before applying new updates.
+	3.	Applies Manifests: Uses updates/<version>/manifest.yml steps to update config files, Docker Compose, etc.
+	4.	Restarts Services: Safely restarts impacted containers.
+	5.	Rollbacks if Needed: If verification fails, the updater automatically reverts to the last known good state.
+	6.	Logs to InfluxDB: Sends update metrics (success/failure) so you can track system changes over time.
 
-### Marine Data
-- NMEA2000 network integration
-- Real-time data processing via SignalK
-- Historical data storage in InfluxDB
-- Customizable Grafana dashboards
+For more details, see UPDATES.md.
 
-### System Monitoring
-- CPU usage and temperature
-- Memory utilization
-- Disk space monitoring
-- System load averages
-- Real-time performance graphs
-- Historical trend analysis
+Development Workflow
+	1.	Local Development
+	•	Clone the repo and modify Python code in services/<service_name>/.
+	•	Optionally, use Docker Compose locally (docker-compose up --build) to test changes.
+	2.	Pushing Changes
+	•	When you push or merge to main, ensure your GitHub Actions (or other CI) builds/pushes images to your container registry (e.g., GHCR).
+	•	Bump version.yml if you want the boat’s custom updater to notice a “new system version.”
+	3.	Auto-Update
+	•	The custom update service on the device will detect the version change, apply updates, and restart containers as needed.
+	•	Logs in InfluxDB help you verify a successful rollout.
 
-### Automated Updates
-- Version-controlled updates
-- Automatic detection of new versions
-- Safe update application
-- Rollback capability
-- Update status monitoring
+Adding a New Service
+	1.	Create a Python Service
+	•	Make a folder under services/ using snake_case (e.g., services/my_new_service/).
+	•	Add your Python code, requirements.txt, etc.
+	2.	Add a Docker Folder
+	•	Create a matching folder under docker/ (kebab-case), e.g., docker/my-new-service/.
+	•	Write a Dockerfile that copies code from services/my_new_service/ into the container.
+	3.	Update docker-compose.yml
+	•	Reference the new service (build context, environment variables, volumes, etc.).
+	4.	Add Config (Optional)
+	•	If your service needs persistent config or data, place it under ~/.data-hub/config/my_new_service/ (the custom updater can manage this during updates).
+	5.	Document
+	•	Add details in UPDATES.md or a dedicated README explaining how to configure or update the new service.
 
-## Development
+Configuration Management
+	•	All service configs live in ~/.data-hub/config/.
+	•	Updates modify config files via manifest steps, ensuring you can roll back if something goes wrong.
+	•	Atomic State Changes: The update service updates ~/.data-hub/state/ only after a successful operation.
 
-1. Local Development
-   - Clone repository
-   - Make changes
-   - Test in local containers
-   - Push to GitHub
+System Persistence
+	1.	InfluxDB Data: ~/.data-hub/config/influxdb/
+	2.	Grafana Dashboards: ~/.data-hub/config/grafana/
+	3.	SignalK Data: ~/.data-hub/config/signalk/
+	4.	Service Config: ~/.data-hub/config/<service_name>/ (e.g., update_service, network_monitor, etc.)
 
-2. Deployment
-   - Merge to main branch
-   - Automatic container updates via update service and Watchtower
-   - Monitor logs for success
+Support & Troubleshooting
 
-### Adding New Services
-1. Create service directory in services/
-2. Add Dockerfile in docker/service-name/
-3. Update docker-compose.yaml
-4. Add service configuration to ~/.data-hub/config/
-5. Add service to update manifests
-6. Document in appropriate README
+Because this is a private repository, support is handled by the maintainers:
+	1.	Check Docs: Consult INSTALLATION.md or UPDATES.md for known issues/solutions.
+	2.	Review Logs: Check container logs via docker logs <container_name> or your InfluxDB dashboards.
+	3.	Contact Maintainers: File an issue or reach out directly if you’re stuck.
 
-### Configuration Management
-1. Service Configurations
-   - All service configs live in ~/.data-hub/config/
-   - Updates modify configs through manifest steps
-   - Backups preserve configs for rollback
+References
+	•	[SeaBits NMEA 2000 Guide](https://seabits.com/nmea-2000-powered-raspberry-pi/)
+	•	[SignalK Documentation](https://signalk.org/)
+	•	[CopperHill PICAN-M Documentation](https://copperhilltech.com/pican-m-nmea-0183-nmea-2000-hat-for-raspberry-pi/)
+	•	[InfluxDB Documentation](https://docs.influxdata.com/influxdb/v1.8/)
+	•	[Grafana Documentation](https://grafana.com/docs/)
 
-2. System State
-   - Version info stored in ~/.data-hub/state/version
-   - Update history in ~/.data-hub/state/updates/
-   - State changes are atomic and backed up
+Feedback or Suggestions?
 
-3. Data Persistence
-   - InfluxDB data: ~/.data-hub/config/influxdb/
-   - Grafana data: ~/.data-hub/config/grafana/
-   - SignalK data: ~/.data-hub/config/signalk/
-   - Update service: ~/.data-hub/config/update_service/
-     - settings.yml: GitHub repo, branch, intervals
-     - history.log: Detailed update logs
-     - metrics.db: Update metrics and status
-   - System metrics: ~/.data-hub/config/system_metrics/
-     - settings.yml: Collection intervals, thresholds
-     - collector.log: Metrics collection logs
-   - Network monitor: ~/.data-hub/config/network_monitor/
-     - settings.yml: Network interfaces, intervals
-     - monitor.log: Network status logs
+Feel free to submit a PR or open a discussion in the repo. We welcome improvements to documentation, code, and overall architecture!
 
-## Support
-
-This is a private repository. For support:
-1. Check the troubleshooting section in the [Installation Guide](docs/INSTALLATION.md)
-2. Review system logs
-3. Contact repository maintainers
-
-## References
-
-- [SeaBits NMEA 2000 Guide](https://seabits.com/nmea-2000-powered-raspberry-pi/)
-- [SignalK Documentation](https://signalk.org/)
-- [CopperHill PICAN-M Documentation](https://copperhilltech.com/pican-m-nmea-0183-nmea-2000-hat-for-raspberry-pi/)
-- [InfluxDB Documentation](https://docs.influxdata.com/influxdb/v1.8/)
-- [Grafana Documentation](https://grafana.com/docs/)
+Happy Sailing!
+– The Data Hub Development Team
