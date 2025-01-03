@@ -36,7 +36,7 @@ The **Data Hub** is a container-based vessel data hub and systems interface, ins
 2. **Boot & Run Setup Script**  
    - Once the Pi is up, SSH in (or attach keyboard/monitor) and run:
      ```bash
-     curl -fsSL https://raw.githubusercontent.com/YourOrg/data-hub/main/setup_data-hub.sh -o setup_data-hub.sh
+     curl -fsSL https://github.com/SV-Afterglow/data-hub/blob/main/setup_data-hub.sh -o setup_data-hub.sh
      chmod +x setup_data-hub.sh
      ./setup_data-hub.sh
      ```
