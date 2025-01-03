@@ -159,7 +159,7 @@ if [ ! -d "$DHUB_DIR" ]; then
   read -rp "Clone the data-hub repository? (y/n): " CLONE_REPO
   if [[ "$CLONE_REPO" =~ ^[Yy]$ ]]; then
     echo -e "${BLUE}[STEP 5]${RESET} Cloning the data-hub repo to $DHUB_DIR..."
-    git clone https://github.com/YourOrg/data-hub.git "$DHUB_DIR"
+    git clone https://github.com/SV-Afterglow/data-hub.git "$DHUB_DIR"
   fi
 fi
 
