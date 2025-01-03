@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   signalk:
-    image: signalk/signalk-server:latest:latest 
+    image: signalk/signalk-server:latest 
     container_name: signalk
     network_mode: host
     volumes:
