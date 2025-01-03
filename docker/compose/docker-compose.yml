@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  signalk:
+    image: signalk/signalk-server:latest
+    container_name: signalk
+    # Use host networking so signalk can directly access can0
+    network_mode: host  
+    # (Optional) mount a volume with preconfigured settings.json
+    volumes:
+      - ./signalk-settings:/home/node/.signalk
+    environment:
+      - TZ=UTC
+    # You might add more environment or restart policy
+    restart: unless-stopped
