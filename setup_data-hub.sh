@@ -192,7 +192,7 @@ fi
 if [ -f "$DHUB_DIR/docker/compose/docker-compose.yml" ]; then
   echo -e "${BLUE}[STEP 7]${RESET} Starting Docker containers with docker-compose..."
   cd "$DHUB_DIR/docker/compose" || exit 1
-  docker-compose up -d
+  docker compose up -d
   echo -e "${GREEN}[OK]${RESET} Containers are starting. Check logs with 'docker-compose logs -f'."
 else
   echo -e "${BLUE}[INFO]${RESET} No docker-compose.yml found at $DHUB_DIR/docker/compose."
