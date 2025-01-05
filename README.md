@@ -84,17 +84,21 @@ For advanced configuration, see `docs/INSTALLATION.md`.
 
 ```
 data-hub/
-├── services/               # Python services (snake_case)
+├── cline_docs/            # Development documentation
+├── docs/                 # Project documentation
+│   ├── proposals/        # Feature proposals
+│   ├── ARCHITECTURE.md   # System architecture details
+│   ├── INSTALLATION.md   # Installation guide
+│   ├── REQUIREMENTS.md   # System requirements
+│   └── UPDATES.md        # Update procedures
+├── scripts/              # Utility scripts
+│   └── can_simulator.py  # CAN bus simulation tool
+├── services/             # Core services
 │   ├── __init__.py
 │   ├── data_hub_monitor/  # System monitoring service
 │   └── network_monitor/   # Network monitoring service
-├── docs/                  # Documentation & proposals
-│   ├── proposals/
-│   ├── ARCHITECTURE.md
-│   ├── INSTALLATION.md
-│   └── REQUIREMENTS.md
-└── version.yml           # Tracks current system version
-
+├── setup_data-hub.sh     # Installation script
+└── version.yml           # System version tracking
 ```
 
 ## System Services
